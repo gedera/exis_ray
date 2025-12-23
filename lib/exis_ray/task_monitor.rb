@@ -20,7 +20,7 @@ module ExisRay
       end
 
       # Logs con Root ID
-      tags = ["Root=#{ExisRay::Tracer.root_id}"]
+      tags = [ExisRay::Tracer.root_id]
       Rails.logger.tagged(*tags) do
         Rails.logger.info "[ExisRay] Iniciando tarea: #{task_name}"
         yield
@@ -41,7 +41,7 @@ module ExisRay
       clean_task_name = task_name.to_s.gsub(':', '-').camelize
       app_name = defined?(Rails) ? Rails.application.class.module_parent_name : 'App'
 
-      ExisRay::Tracer.service_name = "#{app_name}-Cron-#{clean_task_name}"
+      ExisRay::Tracer.service_name = "#{app_name}-#{clean_task_name}"
       ExisRay::Tracer.request_id   = SecureRandom.uuid
       ExisRay::Tracer.created_at   = Time.now.utc.to_f
 

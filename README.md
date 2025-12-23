@@ -108,7 +108,7 @@ def set_exis_ray_context
 
   # 2. ISP Context (e.g., from Headers)
   Current.isp_id = request.headers['X-Isp-Id']
-  
+
   # Note: Setting these automatically prepares headers for ActiveResource
   # and tags for Sentry.
 end
@@ -131,7 +131,7 @@ If `Sidekiq` is present, ExisRay automatically configures Client and Server midd
 # Controller
 def create
   # Trace ID: A, User: 42
-  HardWorker.perform_async(100) 
+  HardWorker.perform_async(100)
 end
 
 # Worker

@@ -25,7 +25,7 @@ module ExisRay
 
         # 4. Ejecución con Logs Taggeados
         # Inyectamos el Root ID en los logs de Rails para correlacionarlos con Sidekiq.
-        tags = ["Root=#{ExisRay::Tracer.root_id}"]
+        tags = [ExisRay::Tracer.root_id]
 
         if Rails.logger.respond_to?(:tagged)
           Rails.logger.tagged(*tags) { yield }

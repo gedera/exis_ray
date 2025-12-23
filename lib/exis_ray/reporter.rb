@@ -1,14 +1,8 @@
 require 'active_support/current_attributes'
 
 module ExisRay
-  # Clase base híbrida para reporte de errores y mensajes.
-  # Soporta tanto la integración moderna (SDK unificado, ExisRay::Tracer)
-  # como la integración legacy (Old Sentry, Session global).
-  #
-  # @example Uso
-  #   class Choto < ExisRay::Report
-  #     # custom logic...
-  #   end
+  # Clase base híbrida para reporte de errores.
+  # Soporta integración moderna (Sentry SDK) y legacy (Raven/Session).
   class Reporter < ActiveSupport::CurrentAttributes
     attribute :contexts, :tags, :transaction_name, :fingerprint
 
@@ -18,6 +12,8 @@ module ExisRay
       self.fingerprint      = []
       self.transaction_name = nil
 
+      # Invocamos limpieza legacy si existe.
+      # Usamos self.class porque clean_legacy_session! es método de clase.
       self.class.clean_legacy_session!
     end
 
@@ -25,7 +21,6 @@ module ExisRay
 
     def self.report(message, context: {}, tags: {}, fingerprint: [], transaction_name: nil)
       prepare_scope(context, tags, fingerprint, transaction_name)
-
       if report_to_new_sentry?
         report_to_new_sentry(message)
       else
@@ -62,17 +57,14 @@ module ExisRay
 
     def self.add_tags(attrs)
       return if attrs.blank?
-
       self.tags = (tags || {}).merge(attrs.as_json)
     end
 
-    # Hook para subclases
     def self.build_custom_context
-      # No-op default
+      # Hook para subclases
     end
 
-    # --- Lógica Legacy (Session & Old Sentry) ---
-
+    # --- Lógica Legacy ---
     def self.clean_legacy_session!
       return unless defined?(::Session) && ::Session.respond_to?(:clean!)
 
@@ -88,17 +80,14 @@ module ExisRay
         str_fingerprint = fingerprint.flatten.join(',')
         ::Session.tags_context.merge!(fingerprint: str_fingerprint)
       end
-
       if transaction_name.present?
         ::Session.tags_context.merge!(transaction_name: transaction_name)
       end
-
       ::Session.tags_context.merge!(tags) if tags.present?
     end
 
     def self.session_context!
-      return unless contexts.present?
-      return unless defined?(::Session)
+      return unless contexts.present? && defined?(::Session)
 
       ::Session.extra_context ||= {}
       ::Session.extra_context.merge!(contexts)
@@ -107,7 +96,6 @@ module ExisRay
     def self.report_to_old_sentry(message)
       session_tag!
       session_context!
-
       Sentry.send_event(message) if defined?(Sentry)
     end
 
@@ -121,22 +109,18 @@ module ExisRay
       end
     end
 
-    # --- Lógica Moderna (New Sentry) ---
+    # --- Lógica Moderna ---
 
     def self.report_to_new_sentry?
       defined?(::NEW_SENTRY) && ::NEW_SENTRY
     end
 
     def self.report_to_new_sentry(message)
-      send_to_new_sentry do
-        Sentry.capture_message(message, fingerprint: fingerprint)
-      end
+      send_to_new_sentry { Sentry.capture_message(message, fingerprint: fingerprint) }
     end
 
     def self.exception_to_new_sentry(exception)
-      send_to_new_sentry do
-        Sentry.capture_exception(exception, level: 'error', fingerprint: fingerprint)
-      end
+      send_to_new_sentry { Sentry.capture_exception(exception, level: 'error', fingerprint: fingerprint) }
     end
 
     def self.send_to_new_sentry
@@ -144,14 +128,12 @@ module ExisRay
 
       Sentry.with_scope do |scope|
         scope.set_transaction_name(transaction_name) if transaction_name.present?
-
         if contexts.present?
           contexts.each do |key, value|
             val = value.is_a?(Hash) ? value : { value: value }
             scope.set_context(key, val)
           end
         end
-
         scope.set_tags(tags) if tags.present?
         yield(scope)
       end
@@ -183,23 +165,19 @@ module ExisRay
     end
 
     def self.build_from_current
-      return unless defined?(ExisRay.configuration.current_class)
+      klass = ExisRay.current_class
+      return unless klass
 
-      if ExisRay.configuration.current_class.respond_to?(:user_id?) && ExisRay.configuration.current_class.user_id?
-        add_tags(user_id: ExisRay.configuration.current_class.user_id)
-      end
+      add_tags(user_id: klass.user_id) if klass.respond_to?(:user_id?) && klass.user_id?
+      add_tags(isp_id: klass.isp_id)   if klass.respond_to?(:isp_id?)  && klass.isp_id?
 
-      if ExisRay.configuration.current_class.respond_to?(:isp_id?)  && ExisRay.configuration.current_class.isp_id?
-        add_tags(isp_id:  ExisRay.configuration.current_class.isp_id)
-      end
-
-      if ExisRay.configuration.current_class.respond_to?(:user) && ExisRay.configuration.current_class.user.present?
-        user_json = ExisRay.configuration.current_class.user.respond_to?(:as_json) ? ExisRay.configuration.current_class.user.as_json : { id: ExisRay.configuration.current_class.user_id }
+      if klass.respond_to?(:user) && klass.user.present?
+        user_json = klass.user.respond_to?(:as_json) ? klass.user.as_json : { id: klass.user_id }
         add_context(user: user_json)
       end
 
-      if ExisRay.configuration.current_class.respond_to?(:isp) && ExisRay.configuration.current_class.isp.present?
-        isp_json = ExisRay.configuration.current_class.isp.respond_to?(:as_json) ? ExisRay.configuration.current_class.isp.as_json : { id: ExisRay.configuration.current_class.isp_id }
+      if klass.respond_to?(:isp) && klass.isp.present?
+        isp_json = klass.isp.respond_to?(:as_json) ? klass.isp.as_json : { id: klass.isp_id }
         add_context(isp: isp_json)
       end
     end

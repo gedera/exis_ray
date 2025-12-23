@@ -2,23 +2,15 @@ require 'active_support/current_attributes'
 
 module ExisRay
   # Clase base para la gestión del contexto de negocio (User, ISP, Correlation).
-  #
-  # @example Uso en la aplicación host:
-  #   # app/models/current.rb
-  #   class Current < ExisRay::Current
-  #     attribute :custom_field
-  #   end
+  # Debe ser heredada por la aplicación host (ej: class Current < ExisRay::Current).
   class Current < ActiveSupport::CurrentAttributes
     attribute :user_id, :isp_id, :correlation_id
 
     # Callback nativo de Rails: Se ejecuta automáticamente al llamar a Current.reset
-    # (Rails lo hace al final de cada request o job).
     resets do
-      # Limpiamos variables memoizadas
       @user = nil
       @isp  = nil
 
-      # Limpiamos contextos externos
       if defined?(PaperTrail)
         PaperTrail.request.whodunnit = nil
         PaperTrail.request.controller_info = {}
@@ -31,7 +23,7 @@ module ExisRay
       end
     end
 
-    # --- Setters con Efectos Secundarios (Hooks) ---
+    # --- Setters con Hooks ---
 
     def user_id=(id)
       super
@@ -46,7 +38,6 @@ module ExisRay
     def isp_id=(id)
       super
       @isp = nil # Invalida cache
-
       if defined?(ActiveResource::Base)
         ActiveResource::Base.headers['IspId'] = id.to_s
       end
@@ -56,7 +47,7 @@ module ExisRay
       super
 
       if defined?(::Session)
-        ::Session.request_id = id # DEPRECATED
+        ::Session.request_id = id # Deprecated legacy support
       end
 
       if defined?(ActiveResource::Base)
@@ -67,13 +58,14 @@ module ExisRay
         PaperTrail.request.controller_info = { correlation_id: id }
       end
 
-      # Integración con Choto (si existe)
-      if defined?(ExisRay.configuration.reporter_class) && ExisRay.configuration.reporter_class.respond_to?(:add_tags)
-        ExisRay.configuration.reporter_class.add_tags(correlation_id: id)
+      # Integración con el Reporter configurado
+      if (reporter = ExisRay.reporter_class) && reporter.respond_to?(:add_tags)
+        reporter.add_tags(correlation_id: id)
       end
     end
 
-    # --- Helpers de Objetos (Lazy Loading Defensivo) ---
+    # --- Helpers de Objetos (Lazy Loading) ---
+    # Estos métodos asumen que la app host tiene modelos ::User e ::Isp
 
     def user=(object)
       @user = object
@@ -83,7 +75,6 @@ module ExisRay
     def user
       return @user if defined?(@user) && @user
 
-      # Buscamos solo si hay ID y la clase User existe en la app
       if user_id && defined?(::User) && ::User.respond_to?(:find_by)
         @user = ::User.find_by(id: user_id)
       else

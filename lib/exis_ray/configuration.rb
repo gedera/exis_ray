@@ -29,8 +29,7 @@ module ExisRay
     def initialize
       @trace_header = 'HTTP_X_AMZN_TRACE_ID'
       @propagation_trace_header = 'X-Amzn-Trace-Id'
-      @reporter_class = nil
-      # Valor por defecto común en Rails, pero sobrescribible
+      @reporter_class = 'Reporter'
       @current_class = 'Current'
     end
   end

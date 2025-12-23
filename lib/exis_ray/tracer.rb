@@ -72,7 +72,7 @@ module ExisRay
       # Nuevo ID para el span actual
       my_new_id = "1-#{Time.now.to_i.to_s(16)}-#{clean_request_id}"
 
-      "Root=#{safe_root};Self=#{my_new_id};CalledFrom=#{service_name};TotalTimeSoFar=#{total_acc_time}ms"
+      "#{safe_root};Self=#{my_new_id};CalledFrom=#{service_name};TotalTimeSoFar=#{total_acc_time}ms"
     end
 
     # Genera un nuevo Root ID compatible con AWS X-Ray.

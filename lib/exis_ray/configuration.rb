@@ -7,6 +7,11 @@ module ExisRay
     #   Por defecto es 'HTTP_X_AMZN_TRACE_ID'.
     attr_accessor :trace_header
 
+    # @!attribute [rw] propagation_trace_header
+    #   @return [String] La key del header HTTP (formato Rack) donde se buscará el Trace ID.
+    #   Por defecto es 'HTTP_WISPRO_TRACE_ID'.
+    attr_accessor :propagation_trace_header
+
     # @!attribute [rw] reporter_class
     #   @return [String, Class, nil] El nombre de la clase de la aplicación host que hereda de {ExisRay::Reporter}.
     #   Permite que el TaskMonitor inyecte tags (como el nombre de la tarea) en la clase correcta

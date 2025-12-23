@@ -22,8 +22,8 @@ module ExisRay
         # Generamos el string propagable (Root=...;Self=...; etc)
         header_value = ExisRay::Tracer.generate_trace_header
 
-        # Usamos el primer header configurado por defecto (generalmente X-Amzn-Trace-Id)
-        header_key = ExisRay.configuration.trace_headers.first
+        # Usamos el header de propagation
+        header_key = ExisRay.configuration.propagation_trace_header
 
         # Inyectamos el header
         env.request_headers[header_key] = header_value

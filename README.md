@@ -162,6 +162,19 @@ If `ActiveResource` is detected, ExisRay patches it to inject headers into all o
 
 ---
 
+#### 🔌 Faraday
+
+Unlike ActiveResource, Faraday connections are often manually configured. You must explicitly add the middleware to your connection block.
+
+```ruby
+# In your Service or API Client
+conn = Faraday.new(url: '[https://other-microservice.internal](https://other-microservice.internal)') do |f|
+  # Add this line to propagate Trace ID & Context automatically
+  f.use ExisRay::FaradayMiddleware
+
+  f.adapter Faraday.default_adapter
+end
+
 ## 🏗 Architecture
 
 * **`ExisRay::Tracer`**: The infrastructure layer. Handles AWS X-Ray format parsing, ID generation, and time calculation (`TotalTimeSoFar`).

@@ -38,10 +38,7 @@ module ExisRay
     end
 
     def self.setup_tracer(task_name)
-      clean_task_name = task_name.to_s.gsub(':', '-').camelize
-      app_name = defined?(Rails) ? Rails.application.class.module_parent_name : 'App'
-
-      ExisRay::Tracer.service_name = "#{app_name}-#{clean_task_name}"
+      ExisRay::Tracer.service_name = task_name.to_s.gsub(':', '-').camelize
       ExisRay::Tracer.request_id   = SecureRandom.uuid
       ExisRay::Tracer.created_at   = Time.now.utc.to_f
 

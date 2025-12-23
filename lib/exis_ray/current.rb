@@ -54,6 +54,11 @@ module ExisRay
 
     def correlation_id=(id)
       super
+
+      if defined?(::Session)
+        ::Session.request_id = id # DEPRECATED
+      end
+
       if defined?(ActiveResource::Base)
         ActiveResource::Base.headers['CorrelationId'] = id.to_s
       end
@@ -63,8 +68,8 @@ module ExisRay
       end
 
       # Integración con Choto (si existe)
-      if defined?(Choto) && Choto.respond_to?(:add_tags)
-        Choto.add_tags(correlation_id: id)
+      if defined?(ExisRay.configuration.reporter_class) && ExisRay.configuration.reporter_class.respond_to?(:add_tags)
+        ExisRay.configuration.reporter_class.add_tags(correlation_id: id)
       end
     end
 

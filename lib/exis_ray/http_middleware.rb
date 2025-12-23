@@ -42,8 +42,8 @@ module ExisRay
       # 2. Hidratar Negocio (Puente con la App)
       # Si la aplicación define un modelo `Current` con `correlation_id`, se lo inyectamos.
       # Esto permite que los logs y herramientas de negocio (como PaperTrail) tengan contexto.
-      if defined?(::Current) && ::Current.respond_to?(:correlation_id=) && ExisRay::Tracer.root_id.present?
-        ::Current.correlation_id = ExisRay::Tracer.correlation_id
+      if defined?(ExisRay.configuration.current_class) && ExisRay.configuration.current_class.respond_to?(:correlation_id=) && ExisRay::Tracer.root_id.present?
+        ExisRay.configuration.current_class.correlation_id = ExisRay::Tracer.correlation_id
       end
 
       # 3. Continuar con la cadena de ejecución

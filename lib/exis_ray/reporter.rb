@@ -18,7 +18,7 @@ module ExisRay
       self.fingerprint      = []
       self.transaction_name = nil
 
-      clean_legacy_session!
+      self.class.clean_legacy_session!
     end
 
     # --- Métodos Públicos ---
@@ -183,18 +183,23 @@ module ExisRay
     end
 
     def self.build_from_current
-      return unless defined?(::Current)
+      return unless defined?(ExisRay.configuration.current_class)
 
-      add_tags(user_id: ::Current.user_id) if ::Current.respond_to?(:user_id?) && ::Current.user_id?
-      add_tags(isp_id:  ::Current.isp_id)  if ::Current.respond_to?(:isp_id?)  && ::Current.isp_id?
+      if ExisRay.configuration.current_class.respond_to?(:user_id?) && ExisRay.configuration.current_class.user_id?
+        add_tags(user_id: ExisRay.configuration.current_class.user_id)
+      end
 
-      if ::Current.respond_to?(:user) && ::Current.user.present?
-        user_json = ::Current.user.respond_to?(:as_json) ? ::Current.user.as_json : { id: ::Current.user_id }
+      if ExisRay.configuration.current_class.respond_to?(:isp_id?)  && ExisRay.configuration.current_class.isp_id?
+        add_tags(isp_id:  ExisRay.configuration.current_class.isp_id)
+      end
+
+      if ExisRay.configuration.current_class.respond_to?(:user) && ExisRay.configuration.current_class.user.present?
+        user_json = ExisRay.configuration.current_class.user.respond_to?(:as_json) ? ExisRay.configuration.current_class.user.as_json : { id: ExisRay.configuration.current_class.user_id }
         add_context(user: user_json)
       end
 
-      if ::Current.respond_to?(:isp) && ::Current.isp.present?
-        isp_json = ::Current.isp.respond_to?(:as_json) ? ::Current.isp.as_json : { id: ::Current.isp_id }
+      if ExisRay.configuration.current_class.respond_to?(:isp) && ExisRay.configuration.current_class.isp.present?
+        isp_json = ExisRay.configuration.current_class.isp.respond_to?(:as_json) ? ExisRay.configuration.current_class.isp.as_json : { id: ExisRay.configuration.current_class.isp_id }
         add_context(isp: isp_json)
       end
     end

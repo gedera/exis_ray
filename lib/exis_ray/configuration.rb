@@ -14,6 +14,13 @@ module ExisRay
     #   @example 'Choto' o 'ErrorReport'
     attr_accessor :reporter_class
 
+    # @!attribute [rw] current_class
+    #   @return [String, Class, nil] El nombre de la clase de la aplicación host que hereda de {ExisRay::Current}.
+    #   Permite que el se inyecte user, correlation_id e isp
+    #   Son modelos genericos que se usan en todos los contextos de los microservicios.
+    #   @example 'Current'
+    attr_accessor :current_class
+
     # Inicializa la configuración con valores por defecto.
     def initialize
       # Estándar de AWS X-Ray

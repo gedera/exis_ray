@@ -55,6 +55,9 @@ module ExisRay
     def self.parse_trace_id
       return unless trace_id.present?
 
+      # Esto lo hago por que cuando estoy en development no viene con el estandar que espero de amazon.
+      self.trace_id = generate_new_root(trace_id) if trace_id.exclude?('Root')
+
       # Convertimos a Hash para evitar errores si cambia el orden de los parámetros
       data = trace_id.split(';').map { |part| part.split('=', 2) }.to_h
 
@@ -76,6 +79,7 @@ module ExisRay
     # @return [Integer] Duración en ms. Devuelve 0 si `created_at` no está seteado.
     def self.current_duration_ms
       return 0 unless created_at
+
       ((Time.now.utc.to_f - created_at) * 1000).round
     end
 
@@ -122,7 +126,7 @@ module ExisRay
         unique_part = SecureRandom.hex(12)
       end
 
-      "1-#{timestamp_hex}-#{unique_part}"
+      "Root=1-#{timestamp_hex}-#{unique_part}"
     end
 
     # Limpia y formatea el Request ID de Rails para cumplir con el estándar de AWS.

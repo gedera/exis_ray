@@ -17,7 +17,7 @@ module ExisRay
         if ExisRay::Tracer.trace_id.present?
           ExisRay::Tracer.trace_id
         elsif ExisRay::Tracer.root_id.present?
-          "Root=#{ExisRay::Tracer.root_id}"
+          ExisRay::Tracer.root_id
         else
           nil
         end

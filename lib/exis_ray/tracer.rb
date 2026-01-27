@@ -66,7 +66,12 @@ module ExisRay
     #
     # @return [String] Header formateado: "Root=...;Self=...;CalledFrom=...;TotalTimeSoFar=...ms"
     def self.generate_trace_header
-      safe_root = root_id || generate_new_root
+      safe_root = if root_id.present?
+                    root_id.start_with?('Root=') ? root_id : "Root=#{root_id}"
+                  else
+                    generate_new_root
+                  end
+
       total_acc_time = (total_time_so_far || 0) + current_duration_ms
 
       # Nuevo ID para el span actual

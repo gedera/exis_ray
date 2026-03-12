@@ -1,5 +1,24 @@
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-12
+
+### Added
+- **Structured JSON Logging:** Introduced a centralized `ExisRay::JsonFormatter` that intercepts all application logs (HTTP, Sidekiq, and Rake tasks) and formats them into context-rich, single-line JSON objects.
+- Added `lograge` as a core dependency to condense standard Rails multi-line HTTP logs into single events.
+- Introduced the `config.log_format` configuration option (accepts `:text` or `:json`).
+- Added native support for `ActiveSupport::TaggedLogging`. Standard Rails tags (`config.log_tags`) are now automatically intercepted and injected as a `"tags"` array within the JSON payload.
+- Added support for merging Lograge's `custom_options` directly into the JSON root.
+- Expanded `README.md` with an "Advanced Logging Guide", detailing environment-specific setup and customization strategies.
+
+### Changed
+- Refactored `Sidekiq::ServerMiddleware` and `TaskMonitor` to intelligently adapt their logging behavior based on the active `log_format`, preventing redundant tagging in JSON mode.
+- Shifted the `Railtie` logging configuration to execute `after: :load_config_initializers`. This guarantees the host application's initializers are fully loaded before ExisRay determines the log format.
+- Enforced strict RuboCop compliance (`Style/StringLiterals` -> double quotes) across all internal classes, methods, and documentation examples.
+
+### Fixed
+- Fixed `NoMethodError: undefined method 'current_tags'` by ensuring `JsonFormatter` correctly includes the `ActiveSupport::TaggedLogging::Formatter` interface.
+- Resolved a race condition during Rails boot where `lograge` failed to initialize if the gem configuration was set via an initializer.
+
 ## [0.1.0] - 2025-12-23
 
 - Initial release

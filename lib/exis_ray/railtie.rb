@@ -22,17 +22,18 @@ module ExisRay
       if ExisRay.configuration.json_logs?
         require "lograge"
 
-        # A. Desactivamos los tags nativos de texto para no romper la estructura JSON
-        app.config.log_tags = nil
+        # A. YA NO BORRAMOS LOS TAGS.
+        # Si el usuario definió config.log_tags = [:uuid], los conservamos.
+        # Nuestro JsonFormatter se encargará de agruparlos en un array JSON.
 
         # B. Activamos Lograge para condensar las múltiples líneas HTTP
         app.config.lograge.enabled = true
 
         # C. CLAVE: Lograge no debe formatear a JSON, solo debe devolver el Hash crudo.
-        # Esto permite que nuestro JsonFormatter inyecte los datos de negocio al final.
         app.config.lograge.formatter = Lograge::Formatters::Raw.new
       else
         # Comportamiento legacy: Text Plain Tags
+        # Aseguramos que sea un array y AGREGAMOS el nuestro sin pisar los del usuario
         app.config.log_tags ||= []
         app.config.log_tags << proc do
           ExisRay::Tracer.trace_id.presence || ExisRay::Tracer.root_id.presence

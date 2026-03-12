@@ -61,7 +61,8 @@ ExisRay.configure do |config|
   # 4. Log Format (New!)
   # Choose the output format for your application logs.
   # Options: :text (default Rails behavior) or :json (Structured logging).
-  config.log_format = :json
+  # Pro-tip: Make it dynamic based on the environment!
+  config.log_format = Rails.env.production? ? :json : :text
 end
 ```
 
@@ -177,6 +178,68 @@ conn = Faraday.new(url: "[https://api.internal](https://api.internal)") do |f|
   f.use ExisRay::FaradayMiddleware
   f.adapter Faraday.default_adapter
 end
+```
+
+---
+
+## 📋 Advanced Logging Guide
+
+ExisRay's `JsonFormatter` is designed to be highly extensible. Here is how you can get the most out of your observability stack.
+
+### 1. Environment Best Practices
+
+For the best developer experience, we recommend using standard text logs in development and structured JSON logs in production.
+
+**File:** `config/environments/production.rb`
+```ruby
+Rails.application.configure do
+  # Force Rails to log to STDOUT so Docker/Swarm can collect the JSON output
+  if ENV["RAILS_LOG_TO_STDOUT"].present?
+    logger           = ActiveSupport::Logger.new(STDOUT)
+    logger.formatter = config.log_formatter
+    config.logger    = ActiveSupport::TaggedLogging.new(logger)
+  end
+
+  # Set an appropriate log level to avoid disk/network saturation
+  config.log_level = :info
+end
+```
+
+### 2. Extending JSON with Rails Tags (`config.log_tags`)
+
+If you are using native Rails tags, ExisRay will automatically capture them and group them into a `"tags"` array within your JSON log. This prevents the JSON structure from breaking.
+
+**File:** `config/environments/production.rb`
+```ruby
+# Add custom tags to your HTTP requests
+config.log_tags = [
+  :uuid,
+  ->(request) { request.headers["X-Custom-Header"] }
+]
+```
+**Output:**
+```json
+{"time":"2026-03-12T14:30:00Z","service":"App-HTTP","tags":["abcd-1234-uuid","CustomValue"],"method":"GET","status":200}
+```
+
+### 3. Extending JSON with Custom Properties (Lograge)
+
+If you prefer to inject key-value pairs directly into the root of the JSON (which is highly recommended for querying in Datadog, Kibana, etc.), you can leverage Lograge's `custom_options` in your host application.
+
+ExisRay will flawlessly merge these attributes with the core Trace ID and Business Context.
+
+**File:** `config/environments/production.rb`
+```ruby
+config.lograge.custom_options = lambda do |event|
+  {
+    ip_address: event.payload[:ip],
+    browser: event.payload[:user_agent]
+  }
+end
+```
+**Output:**
+```json
+{"time":"2026-03-12T14:30:00Z","service":"App-HTTP","root_id":"Root=1-65a...","method":"GET","ip_address":"192.168.1.1","browser":"Chrome","status":200}
 ```
 
 ---

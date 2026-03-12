@@ -2,6 +2,7 @@
 
 require "logger"
 require "json"
+require "active_support/tagged_logging"
 
 module ExisRay
   # Formateador global que intercepta todos los logs de la aplicación y los emite en formato JSON.
@@ -14,6 +15,10 @@ module ExisRay
   # Automáticamente inyecta el contexto de trazabilidad ({ExisRay::Tracer})
   # y el contexto de negocio ({ExisRay::Current}) en cada línea de log.
   class JsonFormatter < ::Logger::Formatter
+    # Solución al NoMethodError: Garantiza que el formateador sea compatible 
+    # con el wrapper de ActiveSupport::TaggedLogging de Rails.
+    include ActiveSupport::TaggedLogging::Formatter if defined?(ActiveSupport::TaggedLogging::Formatter)
+
     # Procesa un mensaje de log y lo formatea como una cadena estructurada en JSON.
     #
     # @param severity [String] El nivel de severidad del log (ej. "INFO", "ERROR", "DEBUG").
@@ -30,6 +35,7 @@ module ExisRay
 
       inject_tracer_context(payload)
       inject_business_context(payload)
+      inject_current_tags(payload)
       process_message(payload, msg)
 
       # Compactamos para eliminar claves con valores nulos (nil) y generamos el JSON
@@ -62,6 +68,16 @@ module ExisRay
 
       if curr.respond_to?(:correlation_id) && curr.correlation_id
         payload[:correlation_id] = curr.correlation_id
+      end
+    end
+
+    # Inyecta cualquier etiqueta nativa (tags) de Rails que esté presente en el hilo actual.
+    #
+    # @param payload [Hash] El diccionario base del log.
+    # @return [void]
+    def inject_current_tags(payload)
+      if respond_to?(:current_tags) && current_tags.any?
+        payload[:tags] = current_tags
       end
     end
 

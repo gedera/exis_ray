@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rails/railtie"
+require "lograge" # Requerido globalmente para que su propio Railtie se registre en el boot
 
 module ExisRay
   # Integración automática de la gema con el ecosistema de Ruby on Rails.
@@ -17,23 +18,14 @@ module ExisRay
     end
 
     # 2. Configuración de Estrategia de Logging (Lograge y Tags)
-    # Se ejecuta antes de que la aplicación termine de cargar sus configuraciones.
-    initializer "exis_ray.configure_logging" do |app|
+    # CLAVE: Usamos `after: :load_config_initializers` para garantizar que la app
+    # ya haya leído `config/initializers/exis_ray.rb` antes de tomar esta decisión.
+    initializer "exis_ray.configure_logging", after: :load_config_initializers do |app|
       if ExisRay.configuration.json_logs?
-        require "lograge"
-
-        # A. YA NO BORRAMOS LOS TAGS.
-        # Si el usuario definió config.log_tags = [:uuid], los conservamos.
-        # Nuestro JsonFormatter se encargará de agruparlos en un array JSON.
-
-        # B. Activamos Lograge para condensar las múltiples líneas HTTP
         app.config.lograge.enabled = true
-
-        # C. CLAVE: Lograge no debe formatear a JSON, solo debe devolver el Hash crudo.
         app.config.lograge.formatter = Lograge::Formatters::Raw.new
       else
         # Comportamiento legacy: Text Plain Tags
-        # Aseguramos que sea un array y AGREGAMOS el nuestro sin pisar los del usuario
         app.config.log_tags ||= []
         app.config.log_tags << proc do
           ExisRay::Tracer.trace_id.presence || ExisRay::Tracer.root_id.presence

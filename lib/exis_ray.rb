@@ -13,6 +13,7 @@ require "exis_ray/task_monitor"
 require "exis_ray/http_middleware"
 require "exis_ray/current"
 require "exis_ray/reporter"
+require "exis_ray/json_formatter"
 
 # Integraciones Opcionales
 # Solo cargamos el middleware de Faraday si la gema está presente en el sistema.

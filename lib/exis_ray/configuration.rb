@@ -25,12 +25,26 @@ module ExisRay
     #   @example 'Current'
     attr_accessor :current_class
 
+    # @!attribute [rw] log_format
+    #   @return [Symbol] El formato en el que se emitirán los logs de la aplicación.
+    #   Puede ser `:text` (comportamiento por defecto de Rails) o `:json` (formato estructurado).
+    #   @example :json
+    attr_accessor :log_format
+
     # Inicializa la configuración con valores por defecto compatibles con AWS X-Ray.
     def initialize
       @trace_header = 'HTTP_X_AMZN_TRACE_ID'
       @propagation_trace_header = 'X-Amzn-Trace-Id'
       @reporter_class = 'Reporter'
       @current_class = 'Current'
+      @log_format = :text
+    end
+
+    # Indica si la aplicación está configurada para emitir logs en formato estructurado (JSON).
+    #
+    # @return [Boolean] `true` si `log_format` es `:json`, `false` en caso contrario.
+    def json_logs?
+      @log_format == :json
     end
   end
 end

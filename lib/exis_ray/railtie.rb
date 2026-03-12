@@ -1,43 +1,62 @@
-require 'rails/railtie'
+# frozen_string_literal: true
+
+require "rails/railtie"
+require "lograge" # Requerido globalmente para que su propio Railtie se registre en el boot
 
 module ExisRay
-  # Integración automática con Rails.
-  # Carga middlewares HTTP, tags de logs e integraciones (Sidekiq/ActiveResource).
+  # Integración automática de la gema con el ecosistema de Ruby on Rails.
+  #
+  # Se encarga de inyectar middlewares, configurar la estrategia de logging
+  # (texto plano o JSON estructurado) e instrumentar dependencias externas
+  # como Sidekiq y ActiveResource durante la fase de inicialización (`boot`) de la app.
   class Railtie < ::Rails::Railtie
     # 1. Middleware HTTP
+    # Intercepta las peticiones entrantes para hidratar el Tracer.
     initializer "exis_ray.configure_middleware" do |app|
-      require 'exis_ray/http_middleware'
+      require "exis_ray/http_middleware"
       app.middleware.insert_after ActionDispatch::RequestId, ExisRay::HttpMiddleware
     end
 
-    # 2. Logs Tags
-    initializer "exis_ray.configure_log_tags" do |app|
-      app.config.log_tags ||= []
-      app.config.log_tags << proc {
-        if ExisRay::Tracer.trace_id.present?
-          ExisRay::Tracer.trace_id
-        elsif ExisRay::Tracer.root_id.present?
-          ExisRay::Tracer.root_id
-        else
-          nil
+    # 2. Configuración de Estrategia de Logging (Lograge y Tags)
+    # CLAVE: Usamos `after: :load_config_initializers` para garantizar que la app
+    # ya haya leído `config/initializers/exis_ray.rb` antes de tomar esta decisión.
+    initializer "exis_ray.configure_logging", after: :load_config_initializers do |app|
+      if ExisRay.configuration.json_logs?
+        app.config.lograge.enabled = true
+        app.config.lograge.formatter = Lograge::Formatters::Raw.new
+      else
+        # Comportamiento legacy: Text Plain Tags
+        app.config.log_tags ||= []
+        app.config.log_tags << proc do
+          ExisRay::Tracer.trace_id.presence || ExisRay::Tracer.root_id.presence
         end
-      }
+      end
     end
 
-    # 3. Integraciones Post-Boot
+    # 3. Integraciones Post-Boot y Forzado de Formateadores
+    # Se ejecuta una vez que las gemas y el entorno de Rails están completamente cargados.
     config.after_initialize do
-      # ActiveResource
-      if defined?(ActiveResource::Base)
-        require 'exis_ray/active_resource_instrumentation'
-        ActiveResource::Base.send(:prepend, ExisRay::ActiveResourceInstrumentation)
-        Rails.logger.info "[ExisRay] ActiveResource instrumentado."
+      # Aplicamos el formateador JSON globalmente al logger ya instanciado de Rails
+      if ExisRay.configuration.json_logs? && Rails.logger
+        Rails.logger.formatter = ExisRay::JsonFormatter.new
+        Rails.logger.info({ message: "[ExisRay] JSON Logging unificado activado." })
       end
 
-      # Sidekiq
-      # Usamos ::Sidekiq para referirnos a la Gema Global y no al módulo local ExisRay::Sidekiq
+      # --- Instrumentación de ActiveResource ---
+      if defined?(ActiveResource::Base)
+        require "exis_ray/active_resource_instrumentation"
+        ActiveResource::Base.send(:prepend, ExisRay::ActiveResourceInstrumentation)
+
+        log_message(
+          text: "[ExisRay] ActiveResource instrumentado.",
+          json: { message: "[ExisRay] ActiveResource instrumentado." }
+        )
+      end
+
+      # --- Instrumentación de Sidekiq ---
       if defined?(::Sidekiq)
-        require 'exis_ray/sidekiq/client_middleware'
-        require 'exis_ray/sidekiq/server_middleware'
+        require "exis_ray/sidekiq/client_middleware"
+        require "exis_ray/sidekiq/server_middleware"
 
         ::Sidekiq.configure_client do |config|
           config.client_middleware do |chain|
@@ -53,7 +72,27 @@ module ExisRay
             chain.prepend ExisRay::Sidekiq::ServerMiddleware
           end
         end
-        Rails.logger.info "[ExisRay] Sidekiq Middleware integrado."
+
+        # Sidekiq maneja su propio logger. Lo forzamos a usar nuestra estructura JSON.
+        if ExisRay.configuration.json_logs? && ::Sidekiq.logger
+          ::Sidekiq.logger.formatter = ExisRay::JsonFormatter.new
+          Rails.logger.info({ message: "[ExisRay] Sidekiq Middleware y JsonFormatter integrados." })
+        else
+          Rails.logger.info "[ExisRay] Sidekiq Middleware integrado."
+        end
+      end
+    end
+
+    # Helper interno para imprimir logs de inicialización respetando el formato elegido.
+    #
+    # @param text [String] El mensaje para el formato texto.
+    # @param json [Hash] El payload para el formato JSON.
+    # @return [void]
+    def self.log_message(text:, json:)
+      if ExisRay.configuration.json_logs?
+        Rails.logger.info(json)
+      else
+        Rails.logger.info(text)
       end
     end
   end

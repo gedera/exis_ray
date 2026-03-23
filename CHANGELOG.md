@@ -1,3 +1,8 @@
+## [0.3.4] - 2026-03-23
+
+### Fixed
+- **Compatibilidad con Rails 7.1+ y Rails 8:** `config.cache_classes` fue deprecado en Rails 7.1 en favor de `config.enable_reloading` (semántica inversa). El helper interno `cache_classes?` ahora detecta cuál API está disponible y usa la correcta, manteniendo compatibilidad con Rails 6, 7 y 8 sin deprecation warnings.
+
 ## [0.3.3] - 2026-03-23
 
 ### Fixed

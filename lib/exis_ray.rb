@@ -101,7 +101,16 @@ module ExisRay
     end
 
     def cache_classes?
-      defined?(Rails) && Rails.application.config.cache_classes
+      return false unless defined?(Rails)
+
+      config = Rails.application.config
+      # Rails 7.1+ reemplazó cache_classes por enable_reloading (semántica inversa).
+      # Soportamos ambas APIs para mantener compatibilidad con Rails 6, 7 y 8.
+      if config.respond_to?(:enable_reloading)
+        !config.enable_reloading
+      else
+        config.cache_classes
+      end
     end
   end
 end

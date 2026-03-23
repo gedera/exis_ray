@@ -10,14 +10,14 @@ module ExisRay
   #
   # @see https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html Documentación de AWS X-Ray
   class Tracer < ActiveSupport::CurrentAttributes
-    attribute :trace_id, :request_id, :root_id, :self_id, :called_from, :total_time_so_far, :created_at, :service_name
+    attribute :trace_id, :request_id, :root_id, :self_id, :called_from, :total_time_so_far, :created_at, :sidekiq_job, :task
 
-    # Devuelve el nombre del servicio actual.
-    # Si no se ha definido manualmente, hace fallback al nombre de la aplicación Rails.
+    # Devuelve el nombre de la aplicación en snake_case (ej: "cold_storage_service").
+    # Se utiliza como identificador global del servicio en logs y trazabilidad.
     #
-    # @return [String] El nombre del servicio (ej: "Wispro", "Wispro-Worker", "App").
+    # @return [String]
     def self.service_name
-      super || (defined?(Rails) ? Rails.application.class.module_parent_name : 'App')
+      @service_name ||= (defined?(Rails) ? Rails.application.class.module_parent_name.underscore : "app")
     end
 
     # Genera un ID de correlación compuesto, útil para logs y auditoría.

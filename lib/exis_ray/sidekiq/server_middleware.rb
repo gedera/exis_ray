@@ -46,6 +46,7 @@ module ExisRay
       def hydrate_tracer(worker, job)
         ExisRay::Tracer.created_at = Time.now.utc.to_f
         ExisRay::Tracer.sidekiq_job = worker.class.name
+        ExisRay::Tracer.source      = "sidekiq"
 
         if job["exis_ray_trace"]
           # Continuidad: Usamos la traza propagada desde el cliente (Web/Cron)

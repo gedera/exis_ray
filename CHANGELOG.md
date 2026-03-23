@@ -1,3 +1,9 @@
+## [0.3.2] - 2026-03-23
+
+### Added
+- **Global `source` field:** Introduced a standardized `source` field in JSON logs to identify the entry point of execution (`http`, `sidekiq`, or `task`).
+- This facilitates global filtering and dashboard creation in observability platforms.
+
 ## [0.3.1] - 2026-03-23
 
 ### Changed

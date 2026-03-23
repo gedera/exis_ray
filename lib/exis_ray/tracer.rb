@@ -10,7 +10,7 @@ module ExisRay
   #
   # @see https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html Documentación de AWS X-Ray
   class Tracer < ActiveSupport::CurrentAttributes
-    attribute :trace_id, :request_id, :root_id, :self_id, :called_from, :total_time_so_far, :created_at, :sidekiq_job, :task
+    attribute :trace_id, :request_id, :root_id, :self_id, :called_from, :total_time_so_far, :created_at, :sidekiq_job, :task, :source
 
     # Devuelve el nombre de la aplicación en snake_case (ej: "cold_storage_service").
     # Se utiliza como identificador global del servicio en logs y trazabilidad.

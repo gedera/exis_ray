@@ -53,6 +53,7 @@ module ExisRay
     # @return [void]
     def self.setup_tracer(task_name)
       ExisRay::Tracer.task         = task_name.to_s
+      ExisRay::Tracer.source       = "task"
       ExisRay::Tracer.request_id   = SecureRandom.uuid
       ExisRay::Tracer.created_at   = Time.now.utc.to_f
 

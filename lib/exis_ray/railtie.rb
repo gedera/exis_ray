@@ -41,18 +41,14 @@ module ExisRay
         require "exis_ray/log_subscriber"
         ExisRay::LogSubscriber.install!
 
-        Rails.logger.info({ message: "[ExisRay] JSON Logging unificado activado." })
+        log_boot("component=exis_ray event=json_logging_enabled")
       end
 
       # --- Instrumentación de ActiveResource ---
       if defined?(ActiveResource::Base)
         require "exis_ray/active_resource_instrumentation"
         ActiveResource::Base.send(:prepend, ExisRay::ActiveResourceInstrumentation)
-
-        log_message(
-          text: "[ExisRay] ActiveResource instrumentado.",
-          json: { message: "[ExisRay] ActiveResource instrumentado." }
-        )
+        log_boot("component=exis_ray event=active_resource_instrumented")
       end
 
       # --- Instrumentación de Sidekiq ---
@@ -75,27 +71,21 @@ module ExisRay
           end
         end
 
-        # Sidekiq maneja su propio logger. Lo forzamos a usar nuestra estructura JSON.
         if ExisRay.configuration.json_logs? && ::Sidekiq.logger
           ::Sidekiq.logger.formatter = ExisRay::JsonFormatter.new
-          Rails.logger.info({ message: "[ExisRay] Sidekiq Middleware y JsonFormatter integrados." })
-        else
-          Rails.logger.info "[ExisRay] Sidekiq Middleware integrado."
         end
+        log_boot("component=exis_ray event=sidekiq_instrumented")
       end
     end
 
-    # Helper interno para imprimir logs de inicialización respetando el formato elegido.
+    # Emite un log de boot en DEBUG con formato key=value.
+    # En modo texto es legible directamente. En modo JSON el JsonFormatter
+    # lo parsea y eleva cada campo al nivel raíz del JSON automáticamente.
     #
-    # @param text [String] El mensaje para el formato texto.
-    # @param json [Hash] El payload para el formato JSON.
+    # @param message [String] String en formato key=value.
     # @return [void]
-    def self.log_message(text:, json:)
-      if ExisRay.configuration.json_logs?
-        Rails.logger.info(json)
-      else
-        Rails.logger.info(text)
-      end
+    def self.log_boot(message)
+      Rails.logger.debug(message)
     end
   end
 end

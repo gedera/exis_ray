@@ -29,14 +29,14 @@ module ExisRay
         curr.correlation_id = ExisRay::Tracer.correlation_id
       end
 
-      log_event(:info, "Iniciando tarea: #{task_name}", task: task_name, status: "started")
+      log_event(:info, "component=exis_ray event=task_started task=#{task_name} status=started")
 
       # Bloque de ejecución con o sin tags dependiendo de la configuración
       execute_with_optional_tags { yield }
 
-      log_event(:info, "Finalizada con éxito.", task: task_name, status: "success")
+      log_event(:info, "component=exis_ray event=task_finished task=#{task_name} status=success")
     rescue StandardError => e
-      log_event(:error, "Falló la tarea #{task_name}: #{e.message}", task: task_name, status: "failed", error: e.message)
+      log_event(:error, "component=exis_ray event=task_failed task=#{task_name} status=failed error=#{e.message.inspect}")
       raise e
     ensure
       # Limpieza centralizada obligatoria para evitar filtraciones de memoria o contexto
@@ -89,12 +89,8 @@ module ExisRay
     # @param message [String] Mensaje en texto plano para el modo clásico.
     # @param payload [Hash] Datos estructurados para el modo JSON.
     # @return [void]
-    def self.log_event(level, message, **payload)
-      if ExisRay.configuration.json_logs?
-        Rails.logger.send(level, payload.merge(message: "[ExisRay] #{message}"))
-      else
-        Rails.logger.send(level, "[ExisRay] #{message}")
-      end
+    def self.log_event(level, message)
+      Rails.logger.send(level, message)
     rescue StandardError
       # El logger nunca debe interrumpir el flujo principal de la tarea.
     end

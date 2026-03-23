@@ -32,7 +32,7 @@ module ExisRay
       prepare_scope(context, tags, fingerprint, transaction_name)
       add_tags(exception: excep.class.to_s)
 
-      Rails.logger.error(excep) unless Rails.env.production?
+      Rails.logger.error(excep.full_message) unless Rails.env.production?
 
       if report_to_new_sentry?
         exception_to_new_sentry(excep)

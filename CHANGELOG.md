@@ -1,3 +1,11 @@
+## [0.4.1] - 2026-03-23
+
+### Changed
+- **Data-Driven Internal Logging:** Refactored internal library logs (boot, instrumentation, task status) from plain text messages to structured Key-Value (KV) strings.
+- This leverages the `JsonFormatter`'s KV parser to elevate fields like `component`, `event`, and `status` to the JSON root, eliminating the need for unstructured `message` fields in infrastructure logs.
+- Simplified `TaskMonitor#log_event` and `Railtie.log_boot` to emit raw KV strings directly to the logger.
+- **Improved local debugging:** The `Reporter` now uses `exception.full_message` in non-production environments to provide a more readable backtrace in the development console.
+
 ## [0.4.0] - 2026-03-23
 
 ### Breaking Changes

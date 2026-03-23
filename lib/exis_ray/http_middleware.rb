@@ -8,7 +8,7 @@ module ExisRay
 
     def call(env)
       # 1. Hidratar Infraestructura
-      ExisRay::Tracer.created_at = Time.now.utc.to_f
+      ExisRay::Tracer.created_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       ExisRay::Tracer.source     = "http"
 
       trace_header_key = ExisRay.configuration.trace_header

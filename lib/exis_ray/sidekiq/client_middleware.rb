@@ -14,11 +14,11 @@ module ExisRay
 
           # 2. Inyectamos el contexto de negocio (Current)
           # Esto permite saber qué Usuario o ISP disparó el job.
-          if ExisRay.current_class.present?
+          if (curr = ExisRay.current_class).present?
             context = {}
-            context[:user_id] = ExisRay.current_class.user_id if ExisRay.current_class.respond_to?(:user_id)
-            context[:isp_id]  = ExisRay.current_class.isp_id if ExisRay.current_class.respond_to?(:isp_id)
-            context[:correlation_id] = ExisRay.current_class.correlation_id if ExisRay.current_class.respond_to?(:correlation_id)
+            context[:user_id]        = curr.user_id        if curr.respond_to?(:user_id)
+            context[:isp_id]         = curr.isp_id         if curr.respond_to?(:isp_id)
+            context[:correlation_id] = curr.correlation_id if curr.respond_to?(:correlation_id)
 
             job['exis_ray_context'] = context
           end

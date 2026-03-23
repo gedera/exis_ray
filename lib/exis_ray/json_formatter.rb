@@ -15,9 +15,15 @@ module ExisRay
   # Automáticamente inyecta el contexto de trazabilidad ({ExisRay::Tracer})
   # y el contexto de negocio ({ExisRay::Current}) en cada línea de log.
   class JsonFormatter < ::Logger::Formatter
-    # Solución al NoMethodError: Garantiza que el formateador sea compatible 
+    # Solución al NoMethodError: Garantiza que el formateador sea compatible
     # con el wrapper de ActiveSupport::TaggedLogging de Rails.
     include ActiveSupport::TaggedLogging::Formatter if defined?(ActiveSupport::TaggedLogging::Formatter)
+
+    # Detecta si un string comienza con al menos un par key=value.
+    KV_DETECT_RE = /\A\w+=/
+
+    # Extrae pares key=value de un string. Soporta valores sin espacios o entre comillas dobles.
+    KV_PARSE_RE  = /(\w+)=("(?:[^"\\]|\\.)*"|\S+)/
 
     # Procesa un mensaje de log y lo formatea como una cadena estructurada en JSON.
     #
@@ -99,7 +105,8 @@ module ExisRay
       if msg.is_a?(Hash)
         payload.merge!(msg)
       elsif msg.is_a?(String) && kv_string?(msg)
-        payload.merge!(parse_kv_string(msg))
+        parsed = parse_kv_string(msg)
+        parsed.empty? ? payload[:message] = msg : payload.merge!(parsed)
       else
         payload[:message] = msg.to_s
       end
@@ -111,7 +118,7 @@ module ExisRay
     # @param str [String]
     # @return [Boolean]
     def kv_string?(str)
-      str.match?(/\A\w+=/)
+      str.match?(KV_DETECT_RE)
     end
 
     # Parsea un string con formato key=value y retorna un Hash.
@@ -121,8 +128,8 @@ module ExisRay
     # @return [Hash]
     def parse_kv_string(str)
       result = {}
-      str.scan(/(\w+)=("(?:[^"\\]|\\.)*"|\S+)/) do |key, value|
-        result[key.to_sym] = value.start_with?('"') ? value[1..-2].gsub('\\"', '"') : value
+      str.scan(KV_PARSE_RE) do |key, value|
+        result[key.to_sym] = value.start_with?('"') ? (value[1..-2] || "").gsub('\\"', '"') : value
       end
       result
     end

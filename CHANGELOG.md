@@ -1,3 +1,25 @@
+## [0.3.3] - 2026-03-23
+
+### Fixed
+- **`ActiveResourceInstrumentation` header incorrecto:** Se corrigió el uso de `trace_header` (formato Rack, ej: `HTTP_X_AMZN_TRACE_ID`) para requests salientes. Ahora se usa `propagation_trace_header` (formato HTTP, ej: `X-Amzn-Trace-Id`), igual que `FaradayMiddleware`. Antes, los microservicios downstream recibían un header con nombre incorrecto y la traza distribuida no se propagaba.
+- **Header injection en `Current` setters:** Los valores asignados a `user_id=`, `isp_id=` y `correlation_id=` ahora son sanitizados antes de escribirse en `ActiveResource::Base.headers`. Se eliminan caracteres CRLF (`\r\n`) para prevenir HTTP header injection hacia otros microservicios.
+- **`Reporter` exponía datos sensibles a Sentry:** `build_from_current` enviaba `user.as_json` completo (incluyendo `password_digest`, tokens, etc.) al contexto de Sentry. Ahora el comportamiento por defecto es enviar solo `{ id: }`. Se exponen los hooks `sentry_user_context` y `sentry_isp_context` para que la app host controle qué campos incluir.
+- **Reloj de pared en cálculo de duración:** `Tracer.created_at` y `current_duration_ms` usaban `Time.now` (afectado por NTP/leap seconds). Ahora usan `Process.clock_gettime(Process::CLOCK_MONOTONIC)` en todos los puntos de asignación (`HttpMiddleware`, `Sidekiq::ServerMiddleware`, `TaskMonitor`) y en el cálculo de duración.
+- **`generate_new_root` ignoraba sufijos no numéricos:** El sufijo del pod/hostname se convertía con `.to_i`, retornando siempre `0` para strings alfanuméricos (ej: `"worker01"` → `00000000`). Ahora se codifican los bytes del string directamente a hex, preservando la unicidad del identificador.
+- **`JsonFormatter#parse_kv_string` crash con quote suelto:** Un valor de un solo caracter `"` provocaba que `value[1..-2]` retornara `nil` y `.gsub` explotara con `NoMethodError`. Corregido con `|| ""` como fallback.
+- **Pérdida silenciosa de mensaje en `JsonFormatter`:** Si `kv_string?` detectaba un string como kv pero `parse_kv_string` no extraía ningún par (ej: `"key="`), el mensaje original desaparecía del JSON sin ir al campo `message`. Ahora cae al fallback correctamente.
+- **`TaskMonitor#log_event` podía enmascarar excepciones del negocio:** Si el logger fallaba dentro de `log_event`, su excepción reemplazaba la excepción original de la tarea. Ahora `log_event` está protegido con `rescue StandardError` interno.
+- **`current_class` y `reporter_class` resueltos dos veces en `ensure`:** En `Sidekiq::ServerMiddleware` y `TaskMonitor`, el bloque `ensure` llamaba `safe_constantize` dos veces por clase. Ahora se asigna a variable local antes del `ensure`.
+
+### Changed
+- **`sentry_user_context` y `sentry_isp_context` como hooks públicos en `Reporter`:** La subclase puede sobreescribir estos métodos para definir exactamente qué atributos del modelo se envían a Sentry, sin exponer datos sensibles por defecto.
+
+### Performance
+- **Memoización de `current_class` y `reporter_class` en producción:** En entornos con `cache_classes=true`, la resolución vía `safe_constantize` se ejecuta una sola vez. En desarrollo se sigue resolviendo por request para respetar el reloading de Zeitwerk.
+- **Regex de `JsonFormatter` extraídas a constantes:** `KV_DETECT_RE` y `KV_PARSE_RE` son ahora constantes de clase, eliminando recompilaciones innecesarias en cada línea de log.
+- **`Current#user` e `Current#isp` usan sentinel para cachear `nil`:** Si `find_by` no encuentra el registro, el resultado se cachea con un objeto sentinel `NOT_FOUND`. Las llamadas subsiguientes retornan `nil` sin consultar la DB.
+- **`Sidekiq::ClientMiddleware` resuelve `current_class` una sola vez** por job encolado en lugar de cuatro veces.
+
 ## [0.3.2] - 2026-03-23
 
 ### Added

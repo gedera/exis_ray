@@ -102,6 +102,26 @@ class Choto < ExisRay::Reporter
 end
 ```
 
+#### Controlling what user/ISP data is sent to Sentry
+
+By default, ExisRay only sends `{ id: }` to Sentry for both user and ISP contexts. This is intentional — sending `user.as_json` without restrictions would expose sensitive attributes (`password_digest`, `reset_password_token`, etc.) to a third-party service.
+
+To include additional fields, override the hooks in your subclass:
+
+```ruby
+class Choto < ExisRay::Reporter
+  def self.sentry_user_context(current)
+    { id: current.user_id, email: current.user&.email, role: current.user&.role }
+  end
+
+  def self.sentry_isp_context(current)
+    { id: current.isp_id, name: current.isp&.name }
+  end
+end
+```
+
+> **Important:** never include attributes like `password_digest`, tokens, or secrets in these methods.
+
 ### 3. Hydrate Context (Controller)
 
 In your `ApplicationController`, verify the incoming request and set the context. ExisRay handles the Trace ID automatically, you just handle the Business Logic.

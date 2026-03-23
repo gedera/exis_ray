@@ -6,10 +6,14 @@ module ExisRay
   class Current < ActiveSupport::CurrentAttributes
     attribute :user_id, :isp_id, :correlation_id
 
+    # Sentinel para distinguir "no consultado" de "consultado y no encontrado".
+    # Evita re-queries a la DB cuando el objeto no existe.
+    NOT_FOUND = Object.new.freeze
+
     # Callback nativo de Rails: Se ejecuta automáticamente al llamar a Current.reset
     resets do
-      @user = nil
-      @isp  = nil
+      @user = NOT_FOUND
+      @isp  = NOT_FOUND
 
       if defined?(PaperTrail)
         PaperTrail.request.whodunnit = nil
@@ -28,7 +32,7 @@ module ExisRay
     def user_id=(id)
       super
       if defined?(ActiveResource::Base)
-        ActiveResource::Base.headers['UserId'] = id.to_s
+        ActiveResource::Base.headers['UserId'] = sanitize_header_value(id)
       end
       if defined?(PaperTrail)
         PaperTrail.request.whodunnit = id
@@ -37,9 +41,9 @@ module ExisRay
 
     def isp_id=(id)
       super
-      @isp = nil # Invalida cache
+      @isp = NOT_FOUND # Invalida cache
       if defined?(ActiveResource::Base)
-        ActiveResource::Base.headers['IspId'] = id.to_s
+        ActiveResource::Base.headers['IspId'] = sanitize_header_value(id)
       end
     end
 
@@ -51,7 +55,7 @@ module ExisRay
       end
 
       if defined?(ActiveResource::Base)
-        ActiveResource::Base.headers['CorrelationId'] = id.to_s
+        ActiveResource::Base.headers['CorrelationId'] = sanitize_header_value(id)
       end
 
       if defined?(PaperTrail)
@@ -68,33 +72,35 @@ module ExisRay
     # Estos métodos asumen que la app host tiene modelos ::User e ::Isp
 
     def user=(object)
-      @user = object
+      @user = object || NOT_FOUND
       self.user_id = object&.id
     end
 
     def user
-      return @user if defined?(@user) && @user
+      @user = NOT_FOUND unless defined?(@user)
+      return nil if @user.equal?(NOT_FOUND) && !user_id
 
-      if user_id && defined?(::User) && ::User.respond_to?(:find_by)
-        @user = ::User.find_by(id: user_id)
-      else
-        nil
+      if @user.equal?(NOT_FOUND)
+        @user = (defined?(::User) && ::User.respond_to?(:find_by) ? ::User.find_by(id: user_id) : nil) || NOT_FOUND
       end
+
+      @user.equal?(NOT_FOUND) ? nil : @user
     end
 
     def isp=(object)
-      @isp = object
+      @isp = object || NOT_FOUND
       self.isp_id = object&.id
     end
 
     def isp
-      return @isp if defined?(@isp) && @isp
+      @isp = NOT_FOUND unless defined?(@isp)
+      return nil if @isp.equal?(NOT_FOUND) && !isp_id
 
-      if isp_id && defined?(::Isp) && ::Isp.respond_to?(:find_by)
-        @isp = ::Isp.find_by(id: isp_id)
-      else
-        nil
+      if @isp.equal?(NOT_FOUND)
+        @isp = (defined?(::Isp) && ::Isp.respond_to?(:find_by) ? ::Isp.find_by(id: isp_id) : nil) || NOT_FOUND
       end
+
+      @isp.equal?(NOT_FOUND) ? nil : @isp
     end
 
     def user?
@@ -107,6 +113,15 @@ module ExisRay
 
     def correlation_id?
       correlation_id.present?
+    end
+
+    private
+
+    # Elimina caracteres CRLF para prevenir HTTP header injection.
+    # Un valor con "\r\n" en un header de ActiveResource podría inyectar
+    # headers arbitrarios en requests hacia otros microservicios.
+    def sanitize_header_value(value)
+      value.to_s.gsub(/[\r\n]/, '')
     end
   end
 end

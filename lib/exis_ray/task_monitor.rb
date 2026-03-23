@@ -41,8 +41,10 @@ module ExisRay
     ensure
       # Limpieza centralizada obligatoria para evitar filtraciones de memoria o contexto
       ExisRay::Tracer.reset
-      ExisRay.current_class&.reset  if ExisRay.current_class.respond_to?(:reset)
-      ExisRay.reporter_class&.reset if ExisRay.reporter_class.respond_to?(:reset)
+      current  = ExisRay.current_class
+      reporter = ExisRay.reporter_class
+      current.reset  if current&.respond_to?(:reset)
+      reporter.reset if reporter&.respond_to?(:reset)
     end
 
     # --- Métodos Privados ---
@@ -55,7 +57,7 @@ module ExisRay
       ExisRay::Tracer.task         = task_name.to_s
       ExisRay::Tracer.source       = "task"
       ExisRay::Tracer.request_id   = SecureRandom.uuid
-      ExisRay::Tracer.created_at   = Time.now.utc.to_f
+      ExisRay::Tracer.created_at   = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
       pod_id = get_pod_identifier
       ExisRay::Tracer.root_id = ExisRay::Tracer.send(:generate_new_root, pod_id)
@@ -93,6 +95,8 @@ module ExisRay
       else
         Rails.logger.send(level, "[ExisRay] #{message}")
       end
+    rescue StandardError
+      # El logger nunca debe interrumpir el flujo principal de la tarea.
     end
 
     private_class_method :get_pod_identifier, :setup_tracer, :execute_with_optional_tags, :log_event

@@ -60,7 +60,8 @@ module ExisRay
     # --- Helpers Centralizados de Resolución de Clases ---
 
     # Resuelve y retorna la clase configurada para manejar el contexto de negocio (Current).
-    # Convierte el String configurado (ej: 'Current') en la clase real constante.
+    # En producción (cache_classes=true) memoiza el resultado para evitar safe_constantize
+    # en cada request. En desarrollo siempre resuelve para soportar el reloading de Zeitwerk.
     #
     # @return [Class, nil] La clase constante (ej: Current) o nil si no se encuentra/configura.
     def current_class
@@ -69,12 +70,15 @@ module ExisRay
       klass_name = configuration.current_class
       return nil unless klass_name.present?
 
-      # Si es String, lo convertimos a constante de forma segura.
-      klass_name.is_a?(String) ? klass_name.safe_constantize : klass_name
+      if cache_classes?
+        @current_class_cache ||= resolve_class(klass_name)
+      else
+        resolve_class(klass_name)
+      end
     end
 
     # Resuelve y retorna la clase configurada para el reporte de errores (Reporter).
-    # Convierte el String configurado (ej: 'Choto') en la clase real constante.
+    # En producción memoiza el resultado. En desarrollo siempre resuelve.
     #
     # @return [Class, nil] La clase constante (ej: Choto) o nil si no se encuentra/configura.
     def reporter_class
@@ -83,7 +87,21 @@ module ExisRay
       klass_name = configuration.reporter_class
       return nil unless klass_name.present?
 
+      if cache_classes?
+        @reporter_class_cache ||= resolve_class(klass_name)
+      else
+        resolve_class(klass_name)
+      end
+    end
+
+    private
+
+    def resolve_class(klass_name)
       klass_name.is_a?(String) ? klass_name.safe_constantize : klass_name
+    end
+
+    def cache_classes?
+      defined?(Rails) && Rails.application.config.cache_classes
     end
   end
 end

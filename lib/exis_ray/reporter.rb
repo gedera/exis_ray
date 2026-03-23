@@ -172,14 +172,35 @@ module ExisRay
       add_tags(isp_id: klass.isp_id)   if klass.respond_to?(:isp_id?)  && klass.isp_id?
 
       if klass.respond_to?(:user) && klass.user.present?
-        user_json = klass.user.respond_to?(:as_json) ? klass.user.as_json : { id: klass.user_id }
-        add_context(user: user_json)
+        add_context(user: sentry_user_context(klass))
       end
 
       if klass.respond_to?(:isp) && klass.isp.present?
-        isp_json = klass.isp.respond_to?(:as_json) ? klass.isp.as_json : { id: klass.isp_id }
-        add_context(isp: isp_json)
+        add_context(isp: sentry_isp_context(klass))
       end
+    end
+
+    # Hook para que la app host controle qué datos del usuario se envían a Sentry.
+    # Por defecto solo se envía el ID para evitar exponer datos sensibles (password_digest, tokens, etc.).
+    #
+    # @example Sobreescribir en la subclase del Reporter de la app
+    #   def self.sentry_user_context(current)
+    #     { id: current.user_id, email: current.user&.email }
+    #   end
+    #
+    # @param current [Class] La clase Current resuelta.
+    # @return [Hash]
+    def self.sentry_user_context(current)
+      { id: current.user_id }
+    end
+
+    # Hook para que la app host controle qué datos del ISP se envían a Sentry.
+    # Por defecto solo se envía el ID.
+    #
+    # @param current [Class] La clase Current resuelta.
+    # @return [Hash]
+    def self.sentry_isp_context(current)
+      { id: current.isp_id }
     end
 
     private_class_method :build_from_current, :build_from_tracer

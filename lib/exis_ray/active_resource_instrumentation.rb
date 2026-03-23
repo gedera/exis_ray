@@ -25,8 +25,9 @@ module ExisRay
         # Generamos el string propagable: "Root=...;Parent=...;Sampled=..."
         trace_header_value = ExisRay::Tracer.generate_trace_header
 
-        # Buscamos la key configurada (ej: 'HTTP_X_AMZN_TRACE_ID' o custom)
-        trace_header_key = ExisRay.configuration.trace_header
+        # Usamos el header de propagación (formato HTTP, ej: 'X-Amzn-Trace-Id'),
+        # NO el trace_header que es formato Rack (HTTP_X_AMZN_TRACE_ID) para lectura entrante.
+        trace_header_key = ExisRay.configuration.propagation_trace_header
 
         # Retornamos un nuevo hash combinado (merge) para no mutar el original por error
         original_headers.merge(trace_header_key => trace_header_value)

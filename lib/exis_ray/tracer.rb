@@ -59,7 +59,7 @@ module ExisRay
     # @return [Integer] Duración en ms.
     def self.current_duration_ms
       return 0 unless created_at
-      ((Time.now.utc.to_f - created_at) * 1000).round
+      ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - created_at) * 1000).round
     end
 
     # Construye el header de trazabilidad para enviar al siguiente servicio.
@@ -89,7 +89,10 @@ module ExisRay
       timestamp_hex = Time.now.to_i.to_s(16)
 
       if suffix_id.present?
-        suffix_hex = suffix_id.to_i.to_s(16).rjust(8, '0')
+        # Codificamos los bytes del string a hex para preservar unicidad
+        # independientemente de si el sufijo es numérico o alfanumérico.
+        # Ej: "worker01" → "776f726b657230 31", "abc" → "616263"
+        suffix_hex = suffix_id.to_s.bytes.map { |b| b.to_s(16).rjust(2, '0') }.join.first(8).rjust(8, '0')
         unique_part = SecureRandom.hex(8) + suffix_hex
       else
         unique_part = SecureRandom.hex(12)

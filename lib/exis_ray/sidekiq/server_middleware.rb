@@ -32,8 +32,10 @@ module ExisRay
       ensure
         # Limpieza vital en Sidekiq para evitar fugas de contexto entre jobs en el mismo hilo.
         ExisRay::Tracer.reset
-        ExisRay.current_class&.reset  if ExisRay.current_class.respond_to?(:reset)
-        ExisRay.reporter_class&.reset if ExisRay.reporter_class.respond_to?(:reset)
+        current  = ExisRay.current_class
+        reporter = ExisRay.reporter_class
+        current.reset  if current&.respond_to?(:reset)
+        reporter.reset if reporter&.respond_to?(:reset)
       end
 
       private
@@ -44,7 +46,7 @@ module ExisRay
       # @param job [Hash] Payload de Sidekiq.
       # @return [void]
       def hydrate_tracer(worker, job)
-        ExisRay::Tracer.created_at = Time.now.utc.to_f
+        ExisRay::Tracer.created_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         ExisRay::Tracer.sidekiq_job = worker.class.name
         ExisRay::Tracer.source      = "sidekiq"
 

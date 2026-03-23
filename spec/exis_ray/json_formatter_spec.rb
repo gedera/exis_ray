@@ -82,6 +82,10 @@ RSpec.describe ExisRay::JsonFormatter do
         expect(result["msg"]).to eq('dijo "hola"')
       end
 
+      it "no crashea con un quote suelto como valor (string malformado)" do
+        expect { call('key="') }.not_to raise_error
+      end
+
       it "soporta múltiples pares con tipos de valor variados" do
         result = call("component=orders event=invoice_generated duration_ms=42.5 retries=0")
 
@@ -91,6 +95,14 @@ RSpec.describe ExisRay::JsonFormatter do
           "duration_ms" => "42.5",
           "retries"     => "0"
         )
+      end
+    end
+
+      it "cae a message si el string parece kv pero no produce ningún par" do
+        result = call("key=")
+
+        expect(result["message"]).to eq("key=")
+        expect(result).not_to have_key("key")
       end
     end
 

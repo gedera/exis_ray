@@ -1,3 +1,12 @@
+## [0.4.2] - 2026-03-23
+
+### Added
+- **Full compliance with "Gabriel's Global Standards" for Logging:**
+  - **Sensitive Data Filtering:** The KV parser and Hash merger now automatically filter sensitive keys (`password`, `token`, `api_key`, `auth`, etc.) replacing values with `[FILTERED]`.
+  - **Standardized HTTP Logs:** Added `component=exis_ray` and `event=http_request` to all automatic Rails request logs.
+  - **Dynamic Log Levels:** `LogSubscriber` now uses `ERROR` level for 5xx status codes and `INFO` for the rest.
+  - **Performance:** Switched to block form for internal `DEBUG` logs in `Railtie` to avoid unnecessary string interpolation.
+
 ## [0.4.1] - 2026-03-23
 
 ### Changed

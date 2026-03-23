@@ -85,7 +85,7 @@ module ExisRay
     # @param message [String] String en formato key=value.
     # @return [void]
     def self.log_boot(message)
-      Rails.logger.debug(message)
+      Rails.logger.debug { message }
     end
   end
 end

@@ -32,7 +32,12 @@ module ExisRay
     # @return [void]
     def process_action(event)
       payload = build_payload(event)
-      logger.info(payload)
+      # Usamos el nivel ERROR si el status es 5xx, cumpliendo el estándar de Gabriel.
+      if payload[:status] && payload[:status] >= 500
+        logger.error(payload)
+      else
+        logger.info(payload)
+      end
     rescue StandardError
       # El logger nunca debe interrumpir el flujo del request.
     end
@@ -65,6 +70,8 @@ module ExisRay
       status  = payload[:status] || exception_status(payload[:exception])
 
       data = {
+        component:  "exis_ray",
+        event:      "http_request",
         method:     payload[:method],
         path:       payload[:path],
         format:     payload[:format],

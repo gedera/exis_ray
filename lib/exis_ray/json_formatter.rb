@@ -25,6 +25,9 @@ module ExisRay
     # Extrae pares key=value de un string. Soporta valores sin espacios o entre comillas dobles.
     KV_PARSE_RE  = /(\w+)=("(?:[^"\\]|\\.)*"|\S+)/
 
+    # Claves sensibles que deben filtrarse automáticamente según el estándar de Gabriel.
+    SENSITIVE_KEYS = /password|pass|passwd|secret|token|api_key|auth/i
+
     # Procesa un mensaje de log y lo formatea como una cadena estructurada en JSON.
     #
     # @param severity [String] El nivel de severidad del log (ej. "INFO", "ERROR", "DEBUG").
@@ -103,7 +106,8 @@ module ExisRay
     # @return [void]
     def process_message(payload, msg)
       if msg.is_a?(Hash)
-        payload.merge!(msg)
+        # Filtramos las claves del Hash antes del merge
+        payload.merge!(filter_sensitive_hash(msg))
       elsif msg.is_a?(String) && kv_string?(msg)
         parsed = parse_kv_string(msg)
         parsed.empty? ? payload[:message] = msg : payload.merge!(parsed)
@@ -129,9 +133,33 @@ module ExisRay
     def parse_kv_string(str)
       result = {}
       str.scan(KV_PARSE_RE) do |key, value|
-        result[key.to_sym] = value.start_with?('"') ? (value[1..-2] || "").gsub('\\"', '"') : value
+        val = value.start_with?('"') ? (value[1..-2] || "").gsub('\\"', '"') : value
+        result[key.to_sym] = filter_sensitive_value(key, val)
       end
       result
+    end
+
+    # Filtra un valor si la clave se considera sensible.
+    #
+    # @param key [String, Symbol]
+    # @param value [Object]
+    # @return [Object]
+    def filter_sensitive_value(key, value)
+      key.to_s.match?(SENSITIVE_KEYS) ? "[FILTERED]" : value
+    end
+
+    # Filtra recursivamente un Hash que contenga claves sensibles.
+    #
+    # @param hash [Hash]
+    # @return [Hash]
+    def filter_sensitive_hash(hash)
+      hash.each_with_object({}) do |(k, v), result|
+        result[k] = if v.is_a?(Hash)
+                      filter_sensitive_hash(v)
+                    else
+                      filter_sensitive_value(k, v)
+                    end
+      end
     end
   end
 end

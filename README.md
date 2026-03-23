@@ -31,7 +31,7 @@ And then execute:
 $ bundle install
 ```
 
-*(Note: ExisRay automatically installs and configures `lograge` as a dependency to handle HTTP log condensation).*
+*(Note: ExisRay handles HTTP log condensation internally via `ExisRay::LogSubscriber`, compatible with Rails 6, 7 and 8. Lograge is no longer required).*
 
 ---
 
@@ -242,25 +242,37 @@ config.log_tags = [
 {"time":"2026-03-12T14:30:00Z","service":"App-HTTP","tags":["abcd-1234-uuid","CustomValue"],"method":"GET","status":200}
 ```
 
-### 3. Extending JSON with Custom Properties (Lograge)
+### 3. Extending JSON with Custom HTTP Fields
 
-If you prefer to inject key-value pairs directly into the root of the JSON (which is highly recommended for querying in Datadog, Kibana, etc.), you can leverage Lograge's `custom_options` in your host application.
+To inject extra fields into each HTTP request log, create a subclass of `ExisRay::LogSubscriber` and override `self.extra_fields`:
 
-ExisRay will flawlessly merge these attributes with the core Trace ID and Business Context.
-
-**File:** `config/environments/production.rb`
+**File:** `app/models/my_log_subscriber.rb`
 ```ruby
-config.lograge.custom_options = lambda do |event|
-  {
-    ip_address: event.payload[:ip],
-    browser: event.payload[:user_agent]
-  }
+class MyLogSubscriber < ExisRay::LogSubscriber
+  def self.extra_fields(event)
+    {
+      ip_address: event.payload[:ip],
+      user_agent: event.payload[:headers]["HTTP_USER_AGENT"]
+    }
+  end
 end
 ```
+
+Then register it in your initializer:
+
+**File:** `config/initializers/exis_ray.rb`
+```ruby
+ExisRay.configure do |config|
+  config.log_subscriber_class = "MyLogSubscriber"
+end
+```
+
 **Output:**
 ```json
-{"time":"2026-03-12T14:30:00Z","service":"App-HTTP","root_id":"Root=1-65a...","method":"GET","ip_address":"192.168.1.1","browser":"Chrome","status":200}
+{"time":"2026-03-12T14:30:00Z","service":"App-HTTP","root_id":"Root=1-65a...","method":"GET","ip_address":"192.168.1.1","user_agent":"Chrome","status":200}
 ```
+
+If you don't need extra fields, skip this step — `ExisRay::LogSubscriber` is used by default with no additional fields.
 
 ---
 
@@ -271,6 +283,7 @@ end
 * **`ExisRay::Reporter`**: The observability layer. Bridges the gap between your app and Sentry.
 * **`ExisRay::JsonFormatter`**: The central logging engine. Intercepts HTTP, Sidekiq, and Tasks to output clean JSON.
     * **KV String Parser:** It automatically detects if a log message (String) uses `key=value` format. If so, it parses the pairs and elevates them to the root of the JSON. For example, `Rails.logger.info "event=boot status=ok"` becomes `{"event":"boot","status":"ok",...}`. It supports quoted values with spaces: `message="something went wrong"`.
+* **`ExisRay::LogSubscriber`**: Replaces Lograge for HTTP request logging. Subscribes to `process_action.action_controller` and suppresses Rails' default multi-line log subscribers. Compatible with Rails 6, 7, and 8. Subclass it and override `self.extra_fields(event)` to inject custom fields.
 * **`ExisRay::TaskMonitor`**: The entry point for non-HTTP processes.
 
 ## License

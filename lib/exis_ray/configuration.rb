@@ -31,6 +31,13 @@ module ExisRay
     #   @example :json
     attr_accessor :log_format
 
+    # @!attribute [rw] log_subscriber_class
+    #   @return [String, nil] Nombre de la subclase de ExisRay::LogSubscriber de la app host.
+    #   Usada para inyectar campos extra en cada log de request HTTP via `extra_fields`.
+    #   Si es nil, se usa ExisRay::LogSubscriber directamente (sin campos extra).
+    #   @example 'MyLogSubscriber'
+    attr_accessor :log_subscriber_class
+
     # Inicializa la configuración con valores por defecto compatibles con AWS X-Ray.
     def initialize
       @trace_header = 'HTTP_X_AMZN_TRACE_ID'
@@ -38,6 +45,7 @@ module ExisRay
       @reporter_class = 'Reporter'
       @current_class = 'Current'
       @log_format = :text
+      @log_subscriber_class = nil
     end
 
     # Indica si la aplicación está configurada para emitir logs en formato estructurado (JSON).

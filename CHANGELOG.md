@@ -1,3 +1,35 @@
+## [0.4.0] - 2026-03-23
+
+### Breaking Changes
+- **Lograge removido como dependencia.** ExisRay ya no depende de Lograge para el logging estructurado de requests HTTP. Si tu app usaba `config.lograge.custom_options`, migrá al nuevo mecanismo de subclase (ver más abajo).
+
+### Added
+- **`ExisRay::LogSubscriber`:** Nuevo subscriber propio que reemplaza Lograge. Se suscribe a `process_action.action_controller` y emite un Hash estructurado directamente al logger, compatible con Rails 6, 7 y 8.
+  - Suprime `ActionController::LogSubscriber` y `ActionView::LogSubscriber` (Rails 3.0+, sin cambios en 6/7/8).
+  - Suprime `Rails::Rack::Logger` para eliminar las líneas "Started GET /..." (Rails 3.2+, firma `call_app(request, env)` desde Rails 5.0+).
+  - Usa `notifier.all_listeners_for` en Rails 7.1+ y `notifier.listeners_for` en Rails 6/7.0 para desuscribir los subscribers por defecto. Si `all_listeners_for` cambia en futuras versiones, revisar `ActiveSupport::Notifications::Fanout`.
+- **`config.log_subscriber_class`:** Nueva opción de configuración para registrar una subclase de `ExisRay::LogSubscriber`. Permite inyectar campos extra en cada log de request HTTP sobreescribiendo `self.extra_fields(event)`. Si no se configura, se usa `ExisRay::LogSubscriber` directamente sin campos extra.
+
+### Migration Guide
+Si usabas `config.lograge.custom_options`, el equivalente es:
+
+```ruby
+# Antes
+config.lograge.custom_options = ->(event) { { user_id: Current.user_id } }
+
+# Después — app/models/my_log_subscriber.rb
+class MyLogSubscriber < ExisRay::LogSubscriber
+  def self.extra_fields(event)
+    { user_id: Current.user_id }
+  end
+end
+
+# config/initializers/exis_ray.rb
+ExisRay.configure do |config|
+  config.log_subscriber_class = "MyLogSubscriber"
+end
+```
+
 ## [0.3.4] - 2026-03-23
 
 ### Fixed

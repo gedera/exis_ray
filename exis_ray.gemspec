@@ -38,8 +38,6 @@ Gem::Specification.new do |spec|
   spec.add_dependency "activesupport", ">= 6.0"
   spec.add_dependency "railties", ">= 6.0"
 
-  spec.add_dependency "lograge", ">= 0.11"
-
   # For more information and examples about making a new gem, check out our
   # guide at: https://bundler.io/guides/creating_gem.html
 end

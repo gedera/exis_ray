@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "rails/railtie"
-require "lograge" # Requerido globalmente para que su propio Railtie se registre en el boot
 
 module ExisRay
   # Integración automática de la gema con el ecosistema de Ruby on Rails.
@@ -17,14 +16,11 @@ module ExisRay
       app.middleware.insert_after ActionDispatch::RequestId, ExisRay::HttpMiddleware
     end
 
-    # 2. Configuración de Estrategia de Logging (Lograge y Tags)
+    # 2. Configuración de Estrategia de Logging
     # CLAVE: Usamos `after: :load_config_initializers` para garantizar que la app
     # ya haya leído `config/initializers/exis_ray.rb` antes de tomar esta decisión.
     initializer "exis_ray.configure_logging", after: :load_config_initializers do |app|
-      if ExisRay.configuration.json_logs?
-        app.config.lograge.enabled = true
-        app.config.lograge.formatter = Lograge::Formatters::Raw.new
-      else
+      unless ExisRay.configuration.json_logs?
         # Comportamiento legacy: Text Plain Tags
         app.config.log_tags ||= []
         app.config.log_tags << proc do
@@ -39,6 +35,12 @@ module ExisRay
       # Aplicamos el formateador JSON globalmente al logger ya instanciado de Rails
       if ExisRay.configuration.json_logs? && Rails.logger
         Rails.logger.formatter = ExisRay::JsonFormatter.new
+
+        # Activamos nuestro LogSubscriber HTTP y suprimimos los de Rails por defecto.
+        # Reemplaza Lograge, compatible con Rails 6, 7 y 8.
+        require "exis_ray/log_subscriber"
+        ExisRay::LogSubscriber.install!
+
         Rails.logger.info({ message: "[ExisRay] JSON Logging unificado activado." })
       end
 

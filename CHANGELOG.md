@@ -1,4 +1,10 @@
-## [Unreleased]
+## [0.3.0] - 2026-03-23
+
+### Added
+- **KV String Parser in JsonFormatter:** The `JsonFormatter` now automatically detects and parses messages in `key=value` format.
+- Extracted pairs from strings are elevated to the JSON root, allowing structured logging from plain string messages.
+- Support for quoted values with spaces (e.g., `message="some text"`) and escaped characters within logs.
+- Added comprehensive RSpec suite for `ExisRay::JsonFormatter` to verify message processing logic.
 
 ## [0.2.0] - 2026-03-12
 

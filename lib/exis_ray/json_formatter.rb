@@ -84,7 +84,10 @@ module ExisRay
     # Procesa el cuerpo del mensaje recibido y lo fusiona con el payload.
     #
     # Si el mensaje es un `Hash` (como el que nos pasará Lograge para peticiones HTTP),
-    # se hace un merge directo. Si es texto plano u otro objeto, se asigna a la clave `:message`.
+    # se hace un merge directo. Si es un String con formato key=value (ej: "event=foo bar=baz"),
+    # se parsea y los campos se elevan al nivel raíz del JSON. Valores con espacios deben estar
+    # entre comillas (ej: message="algo salió mal"). Si el String no sigue ese formato, se asigna
+    # a la clave `:message`.
     #
     # @param payload [Hash] El diccionario base del log.
     # @param msg [String, Hash, Object] El mensaje original recibido por el logger.
@@ -92,9 +95,33 @@ module ExisRay
     def process_message(payload, msg)
       if msg.is_a?(Hash)
         payload.merge!(msg)
+      elsif msg.is_a?(String) && kv_string?(msg)
+        payload.merge!(parse_kv_string(msg))
       else
         payload[:message] = msg.to_s
       end
+    end
+
+    # Determina si un string tiene formato key=value.
+    # Considera que hay formato kv si el string comienza con `word=`.
+    #
+    # @param str [String]
+    # @return [Boolean]
+    def kv_string?(str)
+      str.match?(/\A\w+=/)
+    end
+
+    # Parsea un string con formato key=value y retorna un Hash.
+    # Soporta valores con espacios si están entre comillas dobles (ej: message="algo salió mal").
+    #
+    # @param str [String]
+    # @return [Hash]
+    def parse_kv_string(str)
+      result = {}
+      str.scan(/(\w+)=("(?:[^"\\]|\\.)*"|\S+)/) do |key, value|
+        result[key.to_sym] = value.start_with?('"') ? value[1..-2].gsub('\\"', '"') : value
+      end
+      result
     end
   end
 end

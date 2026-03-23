@@ -250,6 +250,7 @@ end
 * **`ExisRay::Current`**: The business layer. Manages domain identity (`User`, `ISP`).
 * **`ExisRay::Reporter`**: The observability layer. Bridges the gap between your app and Sentry.
 * **`ExisRay::JsonFormatter`**: The central logging engine. Intercepts HTTP, Sidekiq, and Tasks to output clean JSON.
+    * **KV String Parser:** It automatically detects if a log message (String) uses `key=value` format. If so, it parses the pairs and elevates them to the root of the JSON. For example, `Rails.logger.info "event=boot status=ok"` becomes `{"event":"boot","status":"ok",...}`. It supports quoted values with spaces: `message="something went wrong"`.
 * **`ExisRay::TaskMonitor`**: The entry point for non-HTTP processes.
 
 ## License

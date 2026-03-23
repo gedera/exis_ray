@@ -52,7 +52,7 @@ module ExisRay
     # @param task_name [String, Symbol] El nombre de la tarea en ejecución.
     # @return [void]
     def self.setup_tracer(task_name)
-      ExisRay::Tracer.service_name = task_name.to_s.tr(":", "-").camelize
+      ExisRay::Tracer.task         = task_name.to_s
       ExisRay::Tracer.request_id   = SecureRandom.uuid
       ExisRay::Tracer.created_at   = Time.now.utc.to_f
 

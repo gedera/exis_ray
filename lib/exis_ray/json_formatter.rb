@@ -53,6 +53,8 @@ module ExisRay
 
       payload[:root_id]  = ExisRay::Tracer.root_id
       payload[:trace_id] = ExisRay::Tracer.trace_id if ExisRay::Tracer.trace_id
+      payload[:sidekiq_job] = ExisRay::Tracer.sidekiq_job if ExisRay::Tracer.sidekiq_job
+      payload[:task] = ExisRay::Tracer.task if ExisRay::Tracer.task
     end
 
     # Inyecta el contexto de negocio (ID de usuario, ISP, ID de correlación) en el payload.

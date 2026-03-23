@@ -1,3 +1,10 @@
+## [0.3.1] - 2026-03-23
+
+### Changed
+- **Standardized Service Name:** The `service` field in logs now always returns the Rails application name in `snake_case` (e.g., `cold_storage_service`).
+- Removed dynamic service name overrides in `HttpMiddleware`, `Sidekiq::ServerMiddleware`, and `TaskMonitor`.
+- **Enhanced Job/Task Visibility:** Added `sidekiq_job` and `task` fields to the JSON logs, providing specific context without overloading the `service` field.
+
 ## [0.3.0] - 2026-03-23
 
 ### Added

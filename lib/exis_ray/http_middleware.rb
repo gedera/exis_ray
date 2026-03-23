@@ -4,13 +4,11 @@ module ExisRay
   class HttpMiddleware
     def initialize(app)
       @app = app
-      @base_service_name = defined?(Rails) ? Rails.application.class.module_parent_name : 'App'
     end
 
     def call(env)
       # 1. Hidratar Infraestructura
-      ExisRay::Tracer.created_at   = Time.now.utc.to_f
-      ExisRay::Tracer.service_name = "#{@base_service_name}-HTTP"
+      ExisRay::Tracer.created_at = Time.now.utc.to_f
 
       trace_header_key = ExisRay.configuration.trace_header
 

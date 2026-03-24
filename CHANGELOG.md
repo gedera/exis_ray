@@ -1,3 +1,10 @@
+## [0.5.5] - 2026-03-24
+
+### Added
+- **Deep Security Filtering:** The `JsonFormatter` now recursively filters sensitive data within `Array` and nested `Hash` structures.
+- **OTel Semantic Mapping:** Added formal mapping of ExisRay fields to OpenTelemetry Semantic Conventions in `MANIFEST.md`.
+- **Test Hardening:** Expanded test suite to cover deep filtering and ensure correct numeric type-casting in logs.
+
 ## [0.5.4] - 2026-03-24
 
 ### Changed

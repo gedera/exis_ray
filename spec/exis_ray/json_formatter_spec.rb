@@ -98,32 +98,32 @@ RSpec.describe ExisRay::JsonFormatter do
       end
     end
 
-      it "cae a message si el string parece kv pero no produce ningún par" do
+      it "cae a body si el string parece kv pero no produce ningún par" do
         result = call("key=")
 
-        expect(result["message"]).to eq("key=")
+        expect(result["body"]).to eq("key=")
         expect(result).not_to have_key("key")
       end
     end
 
     context "cuando el mensaje es un String libre (sin formato key=value)" do
-      it "asigna el string completo al campo message" do
+      it "asigna el string completo al campo body" do
         result = call("algo salió mal")
 
-        expect(result["message"]).to eq("algo salió mal")
+        expect(result["body"]).to eq("algo salió mal")
         expect(result).to include("level" => "INFO", "service" => "test-service")
       end
 
-      it "asigna un string vacío al campo message" do
+      it "asigna un string vacío al campo body" do
         result = call("")
 
-        expect(result["message"]).to eq("")
+        expect(result["body"]).to eq("")
       end
 
       it "convierte objetos arbitrarios a string via to_s" do
         result = call(42)
 
-        expect(result["message"]).to eq("42")
+        expect(result["body"]).to eq("42")
       end
     end
 

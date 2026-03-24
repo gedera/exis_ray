@@ -1,3 +1,12 @@
+## [0.5.3] - 2026-03-24
+
+### Changed
+- **OpenTelemetry Alignment:** Free-text log lines now emit their content under the `body` key instead of `message`, following the OpenTelemetry Log Data Model specification.
+
+### Fixed
+- **Robust KV Parsing:** Added support for single-quoted values (`' '`) in the KV parser. This fixes cases where human-readable durations or other strings used single quotes.
+- **Quote Sanitization:** Values extracted from the KV parser now have surrounding quotes (single or double) removed before JSON emission.
+
 ## [0.5.2] - 2026-03-24
 
 ### Added

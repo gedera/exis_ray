@@ -22,8 +22,8 @@ module ExisRay
     # Detecta si un string comienza con al menos un par key=value.
     KV_DETECT_RE = /\A\w+=/
 
-    # Extrae pares key=value de un string. Soporta valores sin espacios o entre comillas dobles.
-    KV_PARSE_RE  = /(\w+)=("(?:[^"\\]|\\.)*"|\S+)/
+    # Extrae pares key=value de un string. Soporta valores sin espacios o entre comillas dobles/simples.
+    KV_PARSE_RE  = /(\w+)=("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\S+)/
 
     # Claves sensibles que deben filtrarse automáticamente según el estándar de Gabriel.
     SENSITIVE_KEYS = /password|pass|passwd|secret|token|api_key|auth/i
@@ -99,7 +99,7 @@ module ExisRay
     # se hace un merge directo. Si es un String con formato key=value (ej: "event=foo bar=baz"),
     # se parsea y los campos se elevan al nivel raíz del JSON. Valores con espacios deben estar
     # entre comillas (ej: message="algo salió mal"). Si el String no sigue ese formato, se asigna
-    # a la clave `:message`.
+    # a la clave `:body` (OpenTelemetry log body).
     #
     # @param payload [Hash] El diccionario base del log.
     # @param msg [String, Hash, Object] El mensaje original recibido por el logger.
@@ -110,9 +110,9 @@ module ExisRay
         payload.merge!(filter_sensitive_hash(msg))
       elsif msg.is_a?(String) && kv_string?(msg)
         parsed = parse_kv_string(msg)
-        parsed.empty? ? payload[:message] = msg : payload.merge!(parsed)
+        parsed.empty? ? payload[:body] = msg : payload.merge!(parsed)
       else
-        payload[:message] = msg.to_s
+        payload[:body] = msg.to_s
       end
     end
 
@@ -126,7 +126,7 @@ module ExisRay
     end
 
     # Parsea un string con formato key=value y retorna un Hash.
-    # Soporta valores con espacios si están entre comillas dobles (ej: message="algo salió mal").
+    # Soporta valores con espacios si están entre comillas dobles o simples.
     # Intenta convertir valores numéricos a Float o Integer automáticamente.
     #
     # @param str [String]
@@ -134,7 +134,13 @@ module ExisRay
     def parse_kv_string(str)
       result = {}
       str.scan(KV_PARSE_RE) do |key, value|
-        val = value.start_with?('"') ? (value[1..-2] || "").gsub('\\"', '"') : value
+        # Eliminamos comillas envolventes si existen (dobles o simples)
+        val = if value.start_with?('"', "'")
+                value[1..-2].to_s.gsub("\\#{value[0]}", value[0])
+              else
+                value
+              end
+
         result[key.to_sym] = cast_value(key, val)
       end
       result

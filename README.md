@@ -148,14 +148,14 @@ end
 
 When `config.log_format = :json` is enabled, ExisRay transforms all your application outputs into single-line, context-rich JSON objects.
 
-**HTTP Requests (via Lograge):**
+**HTTP Requests:**
 ```json
 {"time":"2026-03-12T14:30:00Z","level":"INFO","service":"App-HTTP","root_id":"Root=1-65a...bc","trace_id":"Root=1-65a...bc;Self=...","request_id":"9876-abcd-...","user_id":42,"isp_id":10,"method":"GET","path":"/api/v1/users","format":"html","controller":"UsersController","action":"index","status":200,"duration":45.2,"view":20.1,"db":15.0}
 ```
 
 **Sidekiq Jobs & Rake Tasks:**
 ```json
-{"time":"2026-03-12T14:31:00Z","level":"INFO","service":"Sidekiq-HardWorker","root_id":"Root=1-65a...bc","user_id":42,"message":"[ExisRay] Processing payment..."}
+{"time":"2026-03-12T14:31:00Z","level":"INFO","service":"Sidekiq-HardWorker","root_id":"Root=1-65a...bc","user_id":42,"body":"[ExisRay] Processing payment..."}
 ```
 
 ### B. Automatic Sidekiq Integration

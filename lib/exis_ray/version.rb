@@ -2,5 +2,5 @@
 
 module ExisRay
   # Versión actual de la gema.
-  VERSION = "0.5.0"
+  VERSION = "0.5.1"
 end

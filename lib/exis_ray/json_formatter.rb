@@ -127,6 +127,7 @@ module ExisRay
 
     # Parsea un string con formato key=value y retorna un Hash.
     # Soporta valores con espacios si están entre comillas dobles (ej: message="algo salió mal").
+    # Intenta convertir valores numéricos a Float o Integer automáticamente.
     #
     # @param str [String]
     # @return [Hash]
@@ -134,18 +135,25 @@ module ExisRay
       result = {}
       str.scan(KV_PARSE_RE) do |key, value|
         val = value.start_with?('"') ? (value[1..-2] || "").gsub('\\"', '"') : value
-        result[key.to_sym] = filter_sensitive_value(key, val)
+        result[key.to_sym] = cast_value(key, val)
       end
       result
     end
 
     # Filtra un valor si la clave se considera sensible.
+    # Si no es sensible, intenta castear el valor a número si corresponde.
     #
     # @param key [String, Symbol]
     # @param value [Object]
     # @return [Object]
-    def filter_sensitive_value(key, value)
-      key.to_s.match?(SENSITIVE_KEYS) ? "[FILTERED]" : value
+    def cast_value(key, value)
+      return "[FILTERED]" if key.to_s.match?(SENSITIVE_KEYS)
+
+      case value
+      when /\A\d+\z/ then value.to_i
+      when /\A\d+\.\d+\z/ then value.to_f
+      else value
+      end
     end
 
     # Filtra recursivamente un Hash que contenga claves sensibles.

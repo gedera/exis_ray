@@ -1,3 +1,8 @@
+## [0.5.1] - 2026-03-24
+
+### Fixed
+- **Type-Aware KV Parser:** The `JsonFormatter` now automatically casts numeric strings to `Integer` or `Float` when parsing KV messages. This ensures compliance with the Wispro standard where `duration_s` and `count` must be numeric types in the final JSON, not strings.
+
 ## [0.5.0] - 2026-03-23
 
 ### Changed

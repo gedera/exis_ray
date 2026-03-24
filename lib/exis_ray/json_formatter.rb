@@ -165,7 +165,7 @@ module ExisRay
         result[k] = if v.is_a?(Hash)
                       filter_sensitive_hash(v)
                     else
-                      filter_sensitive_value(k, v)
+                      cast_value(k, v)
                     end
       end
     end

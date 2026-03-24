@@ -1,3 +1,9 @@
+## [0.5.4] - 2026-03-24
+
+### Changed
+- **Human-readable durations:** `duration_human` now uses a smarter format: sub-second values show as `"7.2ms"`, values under 60s show as `"1.25s"`, and longer durations use `ActiveSupport::Duration` prose (e.g., `"2 minutes 5 seconds"`).
+- **Shared duration helper:** Extracted `ExisRay::Tracer.format_duration` to consolidate duration formatting used by both `LogSubscriber` and `TaskMonitor`.
+
 ## [0.5.3] - 2026-03-24
 
 ### Changed

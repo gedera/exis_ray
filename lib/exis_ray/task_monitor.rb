@@ -35,12 +35,12 @@ module ExisRay
       execute_with_optional_tags { yield }
 
       duration_s = ExisRay::Tracer.current_duration_s
-      human_time = ActiveSupport::Duration.build(duration_s).inspect
+      human_time = ExisRay::Tracer.format_duration(duration_s)
 
       log_event(:info, "component=exis_ray event=task_finished task=#{task_name} status=success duration_s=#{duration_s} duration_human=\"#{human_time}\"")
     rescue StandardError => e
       duration_s = ExisRay::Tracer.current_duration_s
-      human_time = ActiveSupport::Duration.build(duration_s).inspect
+      human_time = ExisRay::Tracer.format_duration(duration_s)
 
       log_event(:error, "component=exis_ray event=task_finished task=#{task_name} status=failed duration_s=#{duration_s} duration_human=\"#{human_time}\" error_class=#{e.class} error_message=#{e.message.inspect}")
       raise e

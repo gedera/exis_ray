@@ -286,6 +286,25 @@ If you don't need extra fields, skip this step — `ExisRay::LogSubscriber` is u
 * **`ExisRay::LogSubscriber`**: Replaces Lograge for HTTP request logging. Subscribes to `process_action.action_controller` and suppresses Rails' default multi-line log subscribers. Compatible with Rails 6, 7, and 8. Subclass it and override `self.extra_fields(event)` to inject custom fields.
 * **`ExisRay::TaskMonitor`**: The entry point for non-HTTP processes.
 
+## Known Behaviors
+
+### Third-party gem warnings in `body`
+
+ExisRay captures all log output — including warnings emitted by third-party gems — and routes free-text lines to the `body` field. Some gems may include user-identifying data in their warnings.
+
+**Example:** The [Bullet](https://github.com/flyerhzm/bullet) N+1 query detector emits warnings like:
+
+```
+user: gabriel
+GET /clients?page=1
+USE eager loading detected
+  Client => [:gps_point]
+```
+
+This text lands verbatim in `body`. ExisRay does not filter or redact `body` content, as it cannot know what third-party gems will include.
+
+**Recommendation:** If you use Bullet or similar gems in production, configure them to use a separate notification channel (e.g., Slack, Honeybadger) instead of `Rails.logger`, to avoid leaking usernames or other PII into your structured logs.
+
 ## License
 
 The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).

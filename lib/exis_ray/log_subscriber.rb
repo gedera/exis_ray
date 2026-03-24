@@ -84,7 +84,7 @@ module ExisRay
         action:         payload[:action],
         status:         status,
         duration_s:     duration_s,
-        duration_human: ActiveSupport::Duration.build(duration_s).inspect,
+        duration_human: ExisRay::Tracer.format_duration(duration_s),
         view_runtime_s: view_s,
         db_runtime_s:   db_s
       }

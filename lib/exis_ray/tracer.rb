@@ -70,6 +70,23 @@ module ExisRay
       (Process.clock_gettime(Process::CLOCK_MONOTONIC) - created_at).round(4)
     end
 
+    # Formatea una duración en segundos a un string legible por humanos.
+    # - Menos de 1s  → "7.2ms"
+    # - Entre 1-60s  → "1.25s"
+    # - 60s o más    → "2 minutes 5 seconds" (via ActiveSupport::Duration)
+    #
+    # @param seconds [Float] Duración en segundos.
+    # @return [String]
+    def self.format_duration(seconds)
+      if seconds < 1.0
+        "#{(seconds * 1000).round(1)}ms"
+      elsif seconds < 60.0
+        "#{seconds.round(3)}s"
+      else
+        ActiveSupport::Duration.build(seconds.round).inspect
+      end
+    end
+
     # Construye el header de trazabilidad para enviar al siguiente servicio.
     #
     # @return [String] Header formateado: "Root=...;Self=...;CalledFrom=...;TotalTimeSoFar=...ms"

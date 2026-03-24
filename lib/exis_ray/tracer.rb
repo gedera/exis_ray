@@ -58,8 +58,16 @@ module ExisRay
     #
     # @return [Integer] Duración en ms.
     def self.current_duration_ms
-      return 0 unless created_at
-      ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - created_at) * 1000).round
+      (current_duration_s * 1000).round
+    end
+
+    # Calcula el tiempo transcurrido en segundos desde el inicio de la request.
+    # Cumple con el estándar Wispro-Observability-Spec (v1).
+    #
+    # @return [Float] Duración en segundos.
+    def self.current_duration_s
+      return 0.0 unless created_at
+      (Process.clock_gettime(Process::CLOCK_MONOTONIC) - created_at).round(4)
     end
 
     # Construye el header de trazabilidad para enviar al siguiente servicio.

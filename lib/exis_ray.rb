@@ -1,10 +1,12 @@
 require "exis_ray/version"
 
 # Dependencias externas
-# Necesario para 'safe_constantize', 'present?', y 'CurrentAttributes'
+# Necesario para 'safe_constantize', 'present?', 'CurrentAttributes' y 'Duration'
 require "active_support"
 require "active_support/core_ext/string/inflections" # Para safe_constantize
 require "active_support/current_attributes"
+require "active_support/duration"
+require "active_support/core_ext/numeric/time" # Para .seconds, .minutes, etc.
 
 # Componentes internos del Core
 require "exis_ray/configuration"

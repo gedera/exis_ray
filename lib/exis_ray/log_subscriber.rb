@@ -69,18 +69,24 @@ module ExisRay
       payload = event.payload
       status  = payload[:status] || exception_status(payload[:exception])
 
+      # Convertimos milisegundos (Rails default) a segundos (Estandar Wispro)
+      duration_s = (event.duration / 1000.0).round(4)
+      view_s     = payload[:view_runtime] ? (payload[:view_runtime] / 1000.0).round(4) : nil
+      db_s       = payload[:db_runtime] ? (payload[:db_runtime] / 1000.0).round(4) : nil
+
       data = {
-        component:  "exis_ray",
-        event:      "http_request",
-        method:     payload[:method],
-        path:       payload[:path],
-        format:     payload[:format],
-        controller: payload[:controller],
-        action:     payload[:action],
-        status:     status,
-        duration:   event.duration.round(2),
-        view:       payload[:view_runtime]&.round(2),
-        db:         payload[:db_runtime]&.round(2)
+        component:      "exis_ray",
+        event:          "http_request",
+        method:         payload[:method],
+        path:           payload[:path],
+        format:         payload[:format],
+        controller:     payload[:controller],
+        action:         payload[:action],
+        status:         status,
+        duration_s:     duration_s,
+        duration_human: ActiveSupport::Duration.build(duration_s).inspect,
+        view_runtime_s: view_s,
+        db_runtime_s:   db_s
       }
 
       data.merge!(self.class.extra_fields(event))

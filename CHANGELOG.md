@@ -1,3 +1,13 @@
+## [0.5.0] - 2026-03-23
+
+### Changed
+- **Wispro-Observability-Spec (v1) Compliance:** Refactored telemetry across all execution layers (`TaskMonitor` and HTTP `LogSubscriber`).
+- **Unit Standard:** Duration metrics now use `_s` suffix (Float) as the source of truth (e.g., `duration_s`, `view_runtime_s`, `db_runtime_s`).
+- **Human Readability:** Added `duration_human` to both HTTP requests and Background Tasks.
+- **Task Lifecycle:** The closing log now always uses `event=task_finished` with `status`, `duration_s`, and `duration_human` fields.
+- **Error Consistency:** Failed tasks now include `error_class` and `error_message` fields in the JSON log.
+- **Tracer Accuracy:** Improved `Tracer` with `current_duration_s` using monotonic clock precision.
+
 ## [0.4.2] - 2026-03-23
 
 ### Added

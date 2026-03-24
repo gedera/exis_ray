@@ -34,9 +34,15 @@ module ExisRay
       # Bloque de ejecución con o sin tags dependiendo de la configuración
       execute_with_optional_tags { yield }
 
-      log_event(:info, "component=exis_ray event=task_finished task=#{task_name} status=success")
+      duration_s = ExisRay::Tracer.current_duration_s
+      human_time = ActiveSupport::Duration.build(duration_s).inspect
+
+      log_event(:info, "component=exis_ray event=task_finished task=#{task_name} status=success duration_s=#{duration_s} duration_human=\"#{human_time}\"")
     rescue StandardError => e
-      log_event(:error, "component=exis_ray event=task_failed task=#{task_name} status=failed error=#{e.message.inspect}")
+      duration_s = ExisRay::Tracer.current_duration_s
+      human_time = ActiveSupport::Duration.build(duration_s).inspect
+
+      log_event(:error, "component=exis_ray event=task_finished task=#{task_name} status=failed duration_s=#{duration_s} duration_human=\"#{human_time}\" error_class=#{e.class} error_message=#{e.message.inspect}")
       raise e
     ensure
       # Limpieza centralizada obligatoria para evitar filtraciones de memoria o contexto

@@ -163,16 +163,33 @@ module ExisRay
     end
 
     # Filtra recursivamente un Hash que contenga claves sensibles.
+    # Maneja valores anidados de tipo Hash o Array.
     #
     # @param hash [Hash]
     # @return [Hash]
     def filter_sensitive_hash(hash)
       hash.each_with_object({}) do |(k, v), result|
-        result[k] = if v.is_a?(Hash)
-                      filter_sensitive_hash(v)
-                    else
-                      cast_value(k, v)
+        result[k] = case v
+                    when Hash  then filter_sensitive_hash(v)
+                    when Array then filter_sensitive_array(k, v)
+                    else            cast_value(k, v)
                     end
+      end
+    end
+
+    # Filtra recursivamente los elementos de un Array, propagando la clave padre
+    # para que el filtrado de claves sensibles se aplique a hashes anidados.
+    #
+    # @param key [String, Symbol] Clave padre (para filtrado si el array no contiene hashes).
+    # @param array [Array]
+    # @return [Array]
+    def filter_sensitive_array(key, array)
+      array.map do |element|
+        case element
+        when Hash  then filter_sensitive_hash(element)
+        when Array then filter_sensitive_array(key, element)
+        else            cast_value(key, element)
+        end
       end
     end
   end

@@ -26,9 +26,23 @@ Cada línea de log debe llevar los metadatos necesarios para identificar su orig
 *   `source`: El punto de entrada de la ejecución (`http`, `sidekiq`, `task`, `system`).
 
 ### 3. Convenciones de Naming & Tipos
-- **Naming:** Las llaves (keys) deben usar siempre `snake_case`.
+- **Naming:** Las llaves (keys) deben usar siempre `snake_case`. Para campos estándar, se prefiere seguir las **OpenTelemetry Semantic Conventions**.
 - **Valores Numéricos:** Deben emitirse como números reales (sin sufijos de texto) para permitir que el motor de logs realice el casting automático.
 - **Formato:** Pares `key=value` en una sola línea estructurada.
+
+## 🔭 Alineación con OpenTelemetry
+
+Para garantizar la interoperabilidad, `exis_ray` sigue el **OpenTelemetry Log Data Model**. Siempre que sea posible, los campos deben mapearse a las convenciones semánticas oficiales:
+
+| Campo ExisRay | OTel Semantic Convention | Descripción |
+| :--- | :--- | :--- |
+| `body` | `body` | El contenido principal del log. |
+| `level` | `severity_text` | Nivel de importancia. |
+| `duration_s` | `duration` (en segundos) | Tiempo de ejecución. |
+| `method` | `http.request.method` | Método HTTP. |
+| `status` | `http.response.status_code` | Código de respuesta. |
+| `path` | `url.path` | Ruta del request. |
+| `user_id` | `user.id` | Identificador del usuario. |
 
 ## 🏗 Infraestructura de Datos (Automática)
 

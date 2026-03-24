@@ -92,11 +92,10 @@ RSpec.describe ExisRay::JsonFormatter do
         expect(result).to include(
           "component"   => "orders",
           "event"       => "invoice_generated",
-          "duration_ms" => "42.5",
-          "retries"     => "0"
+          "duration_ms" => 42.5,
+          "retries"     => 0
         )
       end
-    end
 
       it "cae a body si el string parece kv pero no produce ningún par" do
         result = call("key=")
@@ -156,16 +155,56 @@ RSpec.describe ExisRay::JsonFormatter do
   end
 
   describe "#parse_kv_string (privado)" do
-    it "retorna un hash con claves symbol" do
+    it "retorna un hash con claves symbol y valores casteados" do
       result = formatter.send(:parse_kv_string, "a=1 b=2")
 
-      expect(result).to eq({ a: "1", b: "2" })
+      expect(result).to eq({ a: 1, b: 2 })
     end
 
     it "desenvuelve las comillas dobles de los valores" do
       result = formatter.send(:parse_kv_string, 'msg="hello world"')
 
       expect(result).to eq({ msg: "hello world" })
+    end
+  end
+
+  describe "#filter_sensitive_hash (privado)" do
+    it "filtra claves sensibles en el nivel raíz" do
+      result = formatter.send(:filter_sensitive_hash, { user: "gabriel", password: "secret" })
+
+      expect(result[:user]).to eq("gabriel")
+      expect(result[:password]).to eq("[FILTERED]")
+    end
+
+    it "filtra claves sensibles en hashes anidados" do
+      result = formatter.send(:filter_sensitive_hash, {
+        db: { host: "localhost", token: "abc123" }
+      })
+
+      expect(result[:db][:host]).to eq("localhost")
+      expect(result[:db][:token]).to eq("[FILTERED]")
+    end
+
+    it "filtra claves sensibles dentro de arrays de hashes" do
+      result = formatter.send(:filter_sensitive_hash, {
+        users: [{ name: "gabriel", password: "secret" }, { name: "ana", password: "other" }]
+      })
+
+      expect(result[:users][0][:name]).to eq("gabriel")
+      expect(result[:users][0][:password]).to eq("[FILTERED]")
+      expect(result[:users][1][:password]).to eq("[FILTERED]")
+    end
+
+    it "filtra claves sensibles en arrays primitivos cuando la clave padre es sensible" do
+      result = formatter.send(:filter_sensitive_hash, { tokens: ["abc", "def"] })
+
+      expect(result[:tokens]).to eq(["[FILTERED]", "[FILTERED]"])
+    end
+
+    it "no altera valores no sensibles en arrays" do
+      result = formatter.send(:filter_sensitive_hash, { tags: ["admin", "active"] })
+
+      expect(result[:tags]).to eq(["admin", "active"])
     end
   end
 end

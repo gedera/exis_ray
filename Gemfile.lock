@@ -1,9 +1,8 @@
 PATH
   remote: .
   specs:
-    exis_ray (0.3.1)
+    exis_ray (0.5.4)
       activesupport (>= 6.0)
-      lograge (>= 0.11)
       railties (>= 6.0)
 
 GEM
@@ -62,11 +61,6 @@ GEM
     language_server-protocol (3.17.0.5)
     lint_roller (1.1.0)
     logger (1.7.0)
-    lograge (0.14.0)
-      actionpack (>= 4)
-      activesupport (>= 4)
-      railties (>= 4)
-      request_store (~> 1.0)
     loofah (2.25.1)
       crass (~> 1.0.2)
       nokogiri (>= 1.12.0)
@@ -134,8 +128,6 @@ GEM
     regexp_parser (2.11.3)
     reline (0.6.3)
       io-console (~> 0.5)
-    request_store (1.7.0)
-      rack (>= 1.4)
     rspec (3.13.2)
       rspec-core (~> 3.13.0)
       rspec-expectations (~> 3.13.0)

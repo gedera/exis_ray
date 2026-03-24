@@ -1,3 +1,10 @@
+## [0.5.2] - 2026-03-24
+
+### Added
+- **Official Documentation:** Introduced `MANIFEST.md` as the source of truth for observability standards.
+- **Universal Type-Casting:** Improved `JsonFormatter` to apply automatic numeric casting (Integer/Float) to direct `Hash` inputs, not just KV strings.
+- **Security Hardening:** Documented explicit bans on PII in logs and established valid `source` entrypoint values.
+
 ## [0.5.1] - 2026-03-24
 
 ### Fixed

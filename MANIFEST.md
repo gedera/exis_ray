@@ -30,25 +30,27 @@ Cada línea de log debe llevar los metadatos necesarios para identificar su orig
 - **Valores Numéricos:** Deben emitirse como números reales (sin sufijos de texto) para permitir que el motor de logs realice el casting automático.
 - **Formato:** Pares `key=value` en una sola línea estructurada.
 
----
+## 🏗 Infraestructura de Datos (Automática)
 
-## Infraestructura de Datos (Automática)
+Para evitar logs redundantes y pesados, **NUNCA** incluyas manualmente las siguientes llaves en tus mensajes de log. La capa de infraestructura (`exis_ray`) las inyecta automáticamente en el nivel raíz del JSON:
 
-La gema `exis_ray` inyecta automáticamente los siguientes metadatos en cada línea de log JSON, por lo que **no deben incluirse manualmente** en los mensajes:
-
-| Llave | Descripción | Origen |
+| Llave | Descripción | Por qué no incluirla |
 | :--- | :--- | :--- |
-| `time` | Marca de tiempo en formato ISO8601 UTC. | Logger |
-| `level` | Nivel de severidad (INFO, ERROR, DEBUG, etc.). | Logger |
-| `service` | Nombre de la aplicación en `snake_case`. | Tracer |
-| `source` | Entrypoint: `http`, `sidekiq`, `task` o `system`. | Tracer |
-| `root_id` | Identificador único de la traza distribuida (AWS X-Ray). | Tracer |
-| `correlation_id` | ID compuesto para rastreo cruzado. | Tracer |
-| `user_id` / `isp_id` | Identidad del sujeto de negocio (si está presente). | Current |
-| `sidekiq_job` | Nombre de la clase del Worker (solo en Sidekiq). | Tracer |
-| `task` | Nombre de la tarea Rake o Cron (solo en TaskMonitor). | Tracer |
+| `time` | Timestamp ISO8601 | Lo añade el Logger base. |
+| `level` | INFO, ERROR, etc. | Lo añade el Logger base. |
+| `service` | Nombre de la App | Se obtiene de la configuración global. |
+| `source` | Entrypoint (http, task) | Lo inyecta el middleware/monitor correspondiente. |
+| `root_id` | Trace ID (AWS X-Ray) | Se gestiona a nivel de hilo/petición. |
+| `correlation_id`| ID de rastreo cruzado | Se genera automáticamente al inicio de la ejecución. |
+| `user_id` / `isp_id`| Contexto de negocio | Se extrae del estado global de la petición. |
+| `sidekiq_job` | Clase del Worker | Inyectado automáticamente en procesos Sidekiq. |
+| `task` | Nombre de la tarea | Inyectado automáticamente por el TaskMonitor. |
+
+> **Regla de Oro:** Tu log manual solo debe contener datos de **tu lógica de negocio**. La infraestructura ya sabe quién eres, de dónde vienes y cuál es tu ID de traza.
 
 ---
+
+## 🛰 Ciclo de Vida del Evento
 
 ## Ciclo de Vida del Evento
 

@@ -33,4 +33,5 @@
 - **No Lograge:** Do not suggest or re-add the Lograge dependency.
 - **Pure Data Logging:** Internal logs use KV strings (`component=exis_ray event=...`).
 - **Resilience:** All logging operations must be wrapped in `rescue StandardError`.
+- **Automatic Fields:** NEVER manually log `time`, `level`, `service`, `source`, `root_id`, `correlation_id`, `sidekiq_job` or `task`. These are handled by the library.
 - **Source Values:** Valid values for `source` field: `http`, `sidekiq`, `task`, `system`.

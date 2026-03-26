@@ -1,3 +1,9 @@
+## [0.5.6] - 2026-03-26
+
+### Added
+- **BugBunny Integration:** Added `ExisRay::BugBunny::PublisherTracing` middleware for `BugBunny::Client` and `BugBunny::Resource`. Injects the active trace context into the `x-trace-id` AMQP header on every published message.
+- **BugBunny Integration:** Added `ExisRay::BugBunny::ConsumerTracing` concern for `BugBunny::Controller`. Restores the ExisRay trace context from `x-trace-id` header via `around_action`, enabling end-to-end distributed tracing across RabbitMQ message boundaries.
+
 ## [0.5.5] - 2026-03-24
 
 ### Added

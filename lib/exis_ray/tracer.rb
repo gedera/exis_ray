@@ -61,6 +61,20 @@ module ExisRay
       (current_duration_s * 1000).round
     end
 
+    # Hidrata el Tracer con un trace header entrante y registra el inicio del contexto.
+    # Centraliza la inicialización de contexto de trazabilidad para todos los entrypoints
+    # (HTTP, Sidekiq, BugBunny, etc.), eliminando duplicación entre middlewares.
+    #
+    # @param trace_id [String] El header de traza entrante (formato AWS X-Ray).
+    # @param source [String] El entrypoint de ejecución ('http', 'sidekiq', 'task', 'system').
+    # @return [void]
+    def self.hydrate(trace_id:, source:)
+      self.created_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      self.source     = source
+      self.trace_id   = trace_id
+      parse_trace_id
+    end
+
     # Calcula el tiempo transcurrido en segundos desde el inicio de la request.
     # Cumple con el estándar Wispro-Observability-Spec (v1).
     #

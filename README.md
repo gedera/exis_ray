@@ -14,6 +14,7 @@ It acts as the backbone of your architecture, ensuring that every request, backg
 * **Sidekiq Integration:** Automatic context propagation (User/ISP/Trace) and log formatting between the Enqueuer and the Worker.
 * **Task Monitor:** A specialized monitor for Rake/Cron tasks to initialize traces and format logs where no HTTP request exists.
 * **HTTP Clients:** Automatically patches `ActiveResource` and provides middleware for `Faraday`.
+* **BugBunny Integration:** Propagates the trace context across RabbitMQ message boundaries via a publisher middleware and a consumer concern.
 
 ---
 
@@ -199,6 +200,40 @@ conn = Faraday.new(url: "[https://api.internal](https://api.internal)") do |f|
   f.adapter Faraday.default_adapter
 end
 ```
+
+### E. BugBunny (RabbitMQ)
+
+If your app publishes messages via [BugBunny](https://github.com/gedera/bug_bunny), ExisRay can propagate the active trace context through the `x-trace-id` AMQP header, and restore it on the consumer side so every log line during message processing shares the same `root_id` as the original HTTP request.
+
+#### Publisher — inject the trace header
+
+Add `ExisRay::BugBunny::PublisherTracing` to your client middleware stack. Works with both `BugBunny::Client` and `BugBunny::Resource`.
+
+```ruby
+client = BugBunny::Client.new(pool: connection_pool) do |stack|
+  stack.use ExisRay::BugBunny::PublisherTracing
+  stack.use BugBunny::Middleware::JsonResponse
+end
+```
+
+If no trace context is active (e.g. a standalone script), the middleware does nothing.
+
+#### Consumer — restore the trace context
+
+Include `ExisRay::BugBunny::ConsumerTracing` in your base controller. It registers an `around_action` that reads `x-trace-id` from the message headers and hydrates `ExisRay::Tracer` before your action runs. The context is always reset in `ensure`, preventing leaks between messages.
+
+```ruby
+class ApplicationController < BugBunny::Controller
+  include ExisRay::BugBunny::ConsumerTracing
+end
+```
+
+**How it works end-to-end:**
+1. **Publish:** The publisher middleware injects `x-trace-id` into the AMQP headers of every outgoing message.
+2. **Consume:** The consumer concern reads that header, restores the trace context, and sets `source=system`.
+3. **Logs:** Every log line emitted during the controller action carries the original `root_id` and `correlation_id` from the upstream HTTP request.
+
+If a message arrives without `x-trace-id` (published without ExisRay), the concern is a no-op.
 
 ---
 

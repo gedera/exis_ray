@@ -46,17 +46,16 @@ module ExisRay
       # @param job [Hash] Payload de Sidekiq.
       # @return [void]
       def hydrate_tracer(worker, job)
-        ExisRay::Tracer.created_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         ExisRay::Tracer.sidekiq_job = worker.class.name
-        ExisRay::Tracer.source      = "sidekiq"
 
         if job["exis_ray_trace"]
           # Continuidad: Usamos la traza propagada desde el cliente (Web/Cron)
-          ExisRay::Tracer.trace_id = job["exis_ray_trace"]
-          ExisRay::Tracer.parse_trace_id
+          ExisRay::Tracer.hydrate(trace_id: job["exis_ray_trace"], source: "sidekiq")
         else
           # Origen: El job nació directamente aquí sin contexto previo
-          ExisRay::Tracer.root_id = ExisRay::Tracer.send(:generate_new_root)
+          ExisRay::Tracer.created_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          ExisRay::Tracer.source     = "sidekiq"
+          ExisRay::Tracer.root_id    = ExisRay::Tracer.send(:generate_new_root)
         end
       end
 

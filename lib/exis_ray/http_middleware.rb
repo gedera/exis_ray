@@ -8,20 +8,14 @@ module ExisRay
 
     def call(env)
       # 1. Hidratar Infraestructura
-      ExisRay::Tracer.created_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      ExisRay::Tracer.source     = "http"
-
-      trace_header_key = ExisRay.configuration.trace_header
-
-      ExisRay::Tracer.trace_id     = env[trace_header_key]
-      ExisRay::Tracer.request_id   = env['action_dispatch.request_id']
-      ExisRay::Tracer.parse_trace_id
+      ExisRay::Tracer.hydrate(
+        trace_id: env[ExisRay.configuration.trace_header],
+        source:   "http"
+      )
+      ExisRay::Tracer.request_id = env['action_dispatch.request_id']
 
       # 2. Hidratar Negocio
-      # Usamos el helper centralizado para obtener la clase Current
-      if (curr = ExisRay.current_class) && curr.respond_to?(:correlation_id=) && ExisRay::Tracer.root_id.present?
-        curr.correlation_id = ExisRay::Tracer.correlation_id
-      end
+      ExisRay.sync_correlation_id
 
       @app.call(env)
     end

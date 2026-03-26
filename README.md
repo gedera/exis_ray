@@ -207,7 +207,9 @@ If your app publishes messages via [BugBunny](https://github.com/gedera/bug_bunn
 
 #### Publisher — inject the trace header
 
-Add `ExisRay::BugBunny::PublisherTracing` to your client middleware stack. Works with both `BugBunny::Client` and `BugBunny::Resource`.
+Add `ExisRay::BugBunny::PublisherTracing` to your publisher middleware stack.
+
+**Using `BugBunny::Client` directly:**
 
 ```ruby
 client = BugBunny::Client.new(pool: connection_pool) do |stack|
@@ -215,6 +217,18 @@ client = BugBunny::Client.new(pool: connection_pool) do |stack|
   stack.use BugBunny::Middleware::JsonResponse
 end
 ```
+
+**Using `BugBunny::Resource`** (via `client_middleware`):
+
+```ruby
+class ApplicationResource < BugBunny::Resource
+  client_middleware do |stack|
+    stack.use ExisRay::BugBunny::PublisherTracing
+  end
+end
+```
+
+Defining it once in a base `ApplicationResource` is enough — all subclasses inherit the middleware stack automatically.
 
 If no trace context is active (e.g. a standalone script), the middleware does nothing.
 

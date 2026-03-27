@@ -1,3 +1,9 @@
+## [0.5.7] - 2026-03-27
+
+### Fixed
+- **JSON HTML Escaping:** `JsonFormatter` now uses `JSON.generate` with `ascii_only: false` instead of `.to_json`, preventing `>` from being escaped as `\u003e` in log output.
+- **BugBunny Header Standardization:** `PublisherTracing` and `ConsumerTracing` now use `ExisRay.configuration.propagation_trace_header` instead of the hardcoded `'x-trace-id'` constant, aligning with the same pattern used by `FaradayMiddleware` and `ActiveResourceInstrumentation`. The header is now fully configurable and consistent across all outgoing transports.
+
 ## [0.5.6] - 2026-03-26
 
 ### Added

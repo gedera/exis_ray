@@ -5,7 +5,8 @@ require 'active_support/concern'
 module ExisRay
   module BugBunny
     # Concern para BugBunny::Controller que restaura el trace context de ExisRay
-    # a partir del header 'x-trace-id' inyectado por el publicador.
+    # a partir del header configurado en `ExisRay.configuration.propagation_trace_header`
+    # (por defecto `'X-Amzn-Trace-Id'`) inyectado por el publicador.
     #
     # Permite que todos los logs emitidos durante el procesamiento de un mensaje
     # incluyan el mismo root_id y correlation_id que el request HTTP original,
@@ -22,7 +23,10 @@ module ExisRay
       extend ActiveSupport::Concern
 
       # Header AMQP desde el cual se lee el trace context propagado.
-      TRACE_HEADER = 'x-trace-id'
+      # Debe coincidir con `propagation_trace_header` usado por el publisher.
+      def self.trace_header
+        ExisRay.configuration.propagation_trace_header
+      end
 
       included do
         around_action :exis_ray_trace_context
@@ -46,7 +50,7 @@ module ExisRay
       #
       # @return [void]
       def setup_exis_ray_context
-        trace_header = headers[TRACE_HEADER]
+        trace_header = headers[self.class.trace_header]
         return unless trace_header.present?
 
         ExisRay::Tracer.hydrate(trace_id: trace_header, source: 'system')

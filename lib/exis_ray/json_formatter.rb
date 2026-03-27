@@ -47,8 +47,9 @@ module ExisRay
       inject_current_tags(payload)
       process_message(payload, msg)
 
-      # Compactamos para eliminar claves con valores nulos (nil) y generamos el JSON
-      "#{payload.compact.to_json}\n"
+      # Compactamos para eliminar claves con valores nulos (nil) y generamos el JSON.
+      # Usamos JSON.generate con unsafe_chars para evitar el escape HTML de > como \u003e.
+      "#{JSON.generate(payload.compact, { ascii_only: false })}\n"
     end
 
     private

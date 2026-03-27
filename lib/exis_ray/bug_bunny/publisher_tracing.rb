@@ -21,18 +21,16 @@ module ExisRay
     #     end
     #   end
     class PublisherTracing < ::BugBunny::Middleware::Base
-      # Header AMQP personalizado para propagar el trace context entre servicios.
-      TRACE_HEADER = 'x-trace-id'
-
       # Inyecta el header de traza antes de publicar el mensaje.
       # Solo actúa si hay un trace context activo (root_id presente).
+      # Usa `propagation_trace_header` de la configuración, igual que FaradayMiddleware.
       #
       # @param env [BugBunny::Request] El objeto request del mensaje saliente.
       # @return [void]
       def on_request(env)
         return unless ExisRay::Tracer.root_id.present?
 
-        env.headers[TRACE_HEADER] = ExisRay::Tracer.generate_trace_header
+        env.headers[ExisRay.configuration.propagation_trace_header] = ExisRay::Tracer.generate_trace_header
       rescue StandardError
         # La propagación de tracing nunca debe interrumpir la publicación de mensajes.
       end

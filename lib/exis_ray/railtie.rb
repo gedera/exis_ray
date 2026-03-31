@@ -44,6 +44,31 @@ module ExisRay
         log_boot("component=exis_ray event=json_logging_enabled")
       end
 
+      # --- Integración BugBunny ---
+      if defined?(::BugBunny)
+        require "exis_ray/bug_bunny/publisher_tracing"
+        require "exis_ray/bug_bunny/consumer_tracing_middleware"
+        ::BugBunny.consumer_middlewares.use ExisRay::BugBunny::ConsumerTracingMiddleware
+        ::BugBunny.configuration.rpc_reply_headers = lambda {
+          next {} unless ExisRay::Tracer.root_id.present?
+
+          { ExisRay.configuration.propagation_trace_header => ExisRay::Tracer.generate_trace_header }
+        }
+        ::BugBunny.configuration.on_rpc_reply = lambda { |headers|
+          begin
+            trace_header = headers&.[](ExisRay.configuration.propagation_trace_header)
+            next unless trace_header.present?
+
+            # Solo actualizamos trace_id — no tocamos created_at ni source del publisher.
+            ExisRay::Tracer.trace_id = trace_header
+            ExisRay::Tracer.parse_trace_id
+            ExisRay.sync_correlation_id
+          rescue StandardError
+          end
+        }
+        log_boot("component=exis_ray event=bug_bunny_instrumented")
+      end
+
       # --- Instrumentación de ActiveResource ---
       if defined?(ActiveResource::Base)
         require "exis_ray/active_resource_instrumentation"

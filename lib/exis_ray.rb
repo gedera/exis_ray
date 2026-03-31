@@ -24,13 +24,6 @@ require "exis_ray/faraday_middleware" if defined?(Faraday)
 # Solo cargamos la instrumentación si ActiveResource está presente.
 require "exis_ray/active_resource_instrumentation" if defined?(ActiveResource::Base)
 
-# Integraciones BugBunny: publisher middleware y consumer concern.
-# Solo se cargan si la gema BugBunny está presente.
-if defined?(::BugBunny)
-  require "exis_ray/bug_bunny/publisher_tracing"
-  require "exis_ray/bug_bunny/consumer_tracing"
-end
-
 # Integración automática con Rails
 # Solo cargamos el Railtie si la constante Rails está definida.
 require "exis_ray/railtie" if defined?(Rails)

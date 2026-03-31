@@ -1,3 +1,16 @@
+## [0.5.8] - 2026-03-31
+
+### Added
+- **`ExisRay::BugBunny::ConsumerTracingMiddleware`:** Nuevo middleware para el consumer stack de BugBunny. Corre antes de que la gema procese cada mensaje (antes de `consumer.message_received`), garantizando que todos los logs internos de BugBunny — `consumer.message_received`, `consumer.route_matched`, `consumer.rpc_reply`, `consumer.message_processed` — incluyan `root_id`, `trace_id` y `source`. Si el mensaje no trae header de traza, genera un `root_id` nuevo automáticamente.
+- **Propagación RPC bidireccional:** El `Railtie` registra automáticamente dos callbacks en BugBunny: `rpc_reply_headers` inyecta el trace header actualizado (`Self`, `TotalTimeSoFar`, `CalledFrom`) en el reply del consumer; `on_rpc_reply` hidrata el tracer en el thread del publisher al recibir la respuesta, permitiendo que `producer.rpc_response_received` y `request_complete` reflejen el viaje completo por el ecosistema de microservicios.
+
+### Changed
+- **BugBunny auto-instrumentado:** La integración BugBunny se mueve al `after_initialize` del `Railtie`, resolviendo el problema de orden de carga. Con ambas gemas en el `Gemfile`, todo se configura automáticamente sin intervención del desarrollador.
+- **MANIFEST.md:** Documentación completa del estándar de observabilidad: semántica de niveles de log, block form obligatorio para DEBUG, medición de duraciones con reloj monotónico, filtrado de claves sensibles, resiliencia del logger, y tabla completa de campos auto-inyectados con condiciones de activación.
+
+### Removed
+- **`ExisRay::BugBunny::ConsumerTracing`:** Concern eliminado. Reemplazado por `ConsumerTracingMiddleware` que cubre el ciclo completo del mensaje, no solo el action del controller.
+
 ## [0.5.7] - 2026-03-27
 
 ### Fixed

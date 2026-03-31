@@ -1,3 +1,13 @@
+## [0.5.9] - 2026-03-31
+
+### Fixed
+- **JSON Object Coercion:** `JsonFormatter` ahora intenta parsear como JSON cualquier valor string que comience con `{` o `[` al procesar KV strings. Esto permite que campos como `queue_opts` y `exchange_opts` emitidos por BugBunny como JSON compacto se serialicen como objetos reales en lugar de strings escapados.
+
+### Added
+- **CLAUDE.md:** Documentación completa del proyecto actualizada a v0.5.9: arquitectura, componentes, métodos clave, campos auto-inyectados, reglas de ejecución y guía de testing en consola.
+- **`.claude/skills/`:** Skills de proyecto para rails-expert, YARD, OpenTelemetry, RuboCop Omakase y README writer — disponibles automáticamente para cualquier dev que use Claude Code en este repo.
+- **`.claude/commands/release`:** Comando `/release` para automatizar el flujo de versioning.
+
 ## [0.5.8] - 2026-03-31
 
 ### Added

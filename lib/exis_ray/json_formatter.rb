@@ -148,7 +148,7 @@ module ExisRay
     end
 
     # Filtra un valor si la clave se considera sensible.
-    # Si no es sensible, intenta castear el valor a número si corresponde.
+    # Si no es sensible, intenta castear el valor a número o a objeto JSON si corresponde.
     #
     # @param key [String, Symbol]
     # @param value [Object]
@@ -159,8 +159,22 @@ module ExisRay
       case value
       when /\A\d+\z/ then value.to_i
       when /\A\d+\.\d+\z/ then value.to_f
-      else value
+      else try_parse_json(value)
       end
+    end
+
+    # Intenta parsear un string como JSON si parece un objeto o array.
+    # Permite que valores como queue_opts={"exclusive":false} se emitan como
+    # objetos JSON en lugar de strings escapados.
+    #
+    # @param value [Object]
+    # @return [Object] El objeto parseado o el valor original si no es JSON válido.
+    def try_parse_json(value)
+      return value unless value.is_a?(String) && (value.start_with?("{") || value.start_with?("["))
+
+      JSON.parse(value)
+    rescue JSON::ParserError
+      value
     end
 
     # Filtra recursivamente un Hash que contenga claves sensibles.

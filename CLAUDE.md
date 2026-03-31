@@ -1,38 +1,158 @@
-# ExisRay Project Memory
+# ExisRay — Project Intelligence
 
-## Architecture & Components
-- `ExisRay::Tracer`: Distributed tracing (AWS X-Ray). Uses `CurrentAttributes` for thread-safety.
-- `ExisRay::Current`: Business context (User, ISP). Abstract base class for host app subclassing.
-- `ExisRay::Reporter`: Sentry wrapper. Abstract base class for host app subclassing.
-- `ExisRay::JsonFormatter`: Core engine. Handles Hash, KV strings, and free-text with automatic masking and **Type Casting**.
-- `ExisRay::LogSubscriber`: Native HTTP logger since v0.4.0. Replaces Lograge.
-- `ExisRay::TaskMonitor`: Lifecycle manager for non-HTTP processes.
+## Qué es esta gema
 
-## Technical Knowledge & Compatibility
+ExisRay es la capa de observabilidad y trazabilidad distribuida del ecosistema Wispro. Se integra con Rails para emitir logs estructurados en JSON, propagar trace context entre servicios (HTTP, Sidekiq, RabbitMQ), y mantener identidad de negocio (user_id, isp_id, correlation_id) en cada línea de log.
 
-### Wispro Observability Spec (v1)
-- **Manifest:** All logging MUST follow the rules defined in `MANIFEST.md`.
-- **Metrics:** Always use `_s` suffix for durations (Float) and `count` for volumes (Integer). Never include units in values.
-- **Type-Awareness:** `JsonFormatter` automatically casts numeric KV values to Float/Integer. Emit raw numbers in KV strings.
-- **Automatic Fields:** Do not manually log `time`, `level`, `service`, `source`, `root_id`, `correlation_id`, `sidekiq_job` or `task`. These are handled by the library.
+El estándar de logging que implementa está definido en `MANIFEST.md`. Ese documento es la fuente de verdad — cualquier duda sobre formato, campos, o semántica de niveles se resuelve ahí.
 
-### Rails Compatibility (6, 7, 8)
-- **Reloading:** Use `cache_classes?` helper (checks `respond_to?(:enable_reloading)`) to avoid deprecation warnings in Rails 7.1+.
-- **Notifications:** Rails 7.1+ uses `all_listeners_for`, while 6/7.0 uses `listeners_for`. Always use `respond_to?` guards when manipulating subscribers.
+---
 
-### Distributed Tracing (AWS X-Ray)
-- **Propagation:** Use `propagation_trace_header` (standard HTTP format) for outgoing requests.
-- **Parsing:** `trace_header` (Rack format) is ONLY for incoming request parsing.
+## Arquitectura & Componentes
 
-## Security & Privacy
-- **Sensitive Key Filtering:** `JsonFormatter` auto-filters keys matching `password|pass|passwd|secret|token|api_key|auth` → replaced with `[FILTERED]`.
-- **Header Injection Prevention:** `ExisRay::Current` sanitizes values via `sanitize_header_value` before storing user/ISP identity.
-- **No PII in Logs:** Never log raw user data. Only IDs (`user_id`, `isp_id`) are permitted.
+### Core
+- **`ExisRay::Tracer`** — Contexto de trazabilidad distribuida (AWS X-Ray). Extiende `ActiveSupport::CurrentAttributes` para thread-safety. Campos: `trace_id`, `root_id`, `self_id`, `source`, `created_at`, `request_id`, `sidekiq_job`, `task`.
+- **`ExisRay::JsonFormatter`** — Formateador global. Acepta Hash, KV strings (`key=value`) y texto libre. Inyecta automáticamente el contexto del Tracer y del Current en cada línea. Castea valores numéricos y filtra claves sensibles.
+- **`ExisRay::Current`** — Contexto de negocio (user_id, isp_id, correlation_id). Clase abstracta — la app host la subclasifica.
+- **`ExisRay::Reporter`** — Wrapper de Sentry. Clase abstracta — la app host la subclasifica.
+- **`ExisRay::Configuration`** — Configuración global con defaults para AWS X-Ray.
 
-## Execution Rules
-- **No Lograge:** Do not suggest or re-add the Lograge dependency.
-- **Pure Data Logging:** Internal logs use KV strings (`component=exis_ray event=...`).
-- **OTel Compliance:** Always follow the guidelines in `.gemini/docs/TELEMETRY_GUIDELINES.md` and alignment in `MANIFEST.md`. Use OTel Semantic Conventions for new attributes.
-- **Resilience:** All logging operations must be wrapped in `rescue StandardError`.
-- **Automatic Fields:** NEVER manually log `time`, `level`, `service`, `source`, `root_id`, `correlation_id`, `sidekiq_job` or `task`. These are handled by the library.
-- **Source Values:** Valid values for `source` field: `http`, `sidekiq`, `task`, `system`.
+### Integraciones HTTP
+- **`ExisRay::HttpMiddleware`** — Rack middleware. Hidrata el Tracer con el header entrante. Se inserta automáticamente después de `ActionDispatch::RequestId`.
+- **`ExisRay::LogSubscriber`** — Logger nativo de requests HTTP. Reemplaza Lograge. Solo activo con `json_logs: true`.
+- **`ExisRay::FaradayMiddleware`** — Inyecta `propagation_trace_header` en requests salientes via Faraday.
+- **`ExisRay::ActiveResourceInstrumentation`** — Ídem para ActiveResource.
+
+### Integraciones Sidekiq
+- **`ExisRay::Sidekiq::ClientMiddleware`** — Inyecta `exis_ray_trace` en el payload del job antes de encolarlo.
+- **`ExisRay::Sidekiq::ServerMiddleware`** — Hidrata el Tracer al inicio de cada job. Genera root_id nuevo si el job no trae trace.
+
+### Integraciones BugBunny (RabbitMQ)
+- **`ExisRay::BugBunny::PublisherTracing`** — Middleware para `BugBunny::Client`/`BugBunny::Resource`. Inyecta `propagation_trace_header` en cada mensaje publicado.
+- **`ExisRay::BugBunny::ConsumerTracingMiddleware`** — Consumer middleware. Corre antes de todos los logs internos de BugBunny. Hidrata el Tracer desde el header AMQP entrante o genera root_id nuevo.
+- **Railtie hooks** — `rpc_reply_headers` inyecta el trace actualizado en el reply del consumer. `on_rpc_reply` hidrata el Tracer en el thread del publisher al recibir la respuesta.
+
+### Procesos en Background
+- **`ExisRay::TaskMonitor`** — Lifecycle manager para Rake/Cron. Genera root_id, loguea `task_started`/`task_finished` con `duration_s` y `status`.
+
+---
+
+## Métodos Clave
+
+```ruby
+# Hidratar el Tracer (HTTP, Sidekiq, BugBunny consumer)
+ExisRay::Tracer.hydrate(trace_id: header_string, source: 'http')
+
+# Sincronizar correlation_id al Current configurado
+ExisRay.sync_correlation_id
+
+# Generar header de propagación para el siguiente servicio
+ExisRay::Tracer.generate_trace_header
+# => "Root=1-abc123-...;Self=...;CalledFrom=wispro_agent;TotalTimeSoFar=42ms"
+
+# Acceder a la configuración
+ExisRay.configuration.propagation_trace_header  # => 'X-Amzn-Trace-Id'
+ExisRay.configuration.json_logs?                # => true/false
+```
+
+---
+
+## Campos Auto-Inyectados
+
+`JsonFormatter` inyecta estos campos automáticamente. **Nunca** incluirlos manualmente en logs:
+
+| Campo | Condición |
+|:------|:----------|
+| `time` | Siempre |
+| `level` | Siempre |
+| `service` | Siempre |
+| `root_id` | Cuando hay trace context activo |
+| `trace_id` | Cuando hay trace context activo |
+| `source` | Cuando hay trace context activo |
+| `correlation_id` | Cuando `Current.correlation_id` está presente |
+| `user_id` | Cuando `Current.user_id` está presente |
+| `isp_id` | Cuando `Current.isp_id` está presente |
+| `sidekiq_job` | Solo en procesos Sidekiq |
+| `task` | Solo en procesos TaskMonitor |
+| `tags` | Solo si hay Rails tagged logging activo |
+
+---
+
+## Reglas de Ejecución
+
+### Logging
+- Todo log interno usa KV strings: `component=exis_ray event=algo`
+- `component` siempre en `snake_case`
+- DEBUG siempre en block form: `logger.debug { "k=#{v}" }`
+- Nunca `Kernel#warn` ni `$stderr`
+- Toda operación de logging envuelta en `rescue StandardError`
+- Duraciones con `Process.clock_gettime(Process::CLOCK_MONOTONIC)`, nunca `Time.now`
+
+### Seguridad
+- Claves sensibles (`password|pass|passwd|secret|token|api_key|auth`) → `[FILTERED]`
+- Nunca loguear PII. Solo `user_id`, `isp_id`
+
+### Source válidos
+`http` | `sidekiq` | `task` | `system`
+
+### Propagación de headers
+- **Entrante HTTP:** `trace_header` (formato Rack: `HTTP_X_AMZN_TRACE_ID`) — solo en `HttpMiddleware`
+- **Saliente (todos los transportes):** `propagation_trace_header` (formato HTTP: `X-Amzn-Trace-Id`)
+
+### Prohibiciones
+- No Lograge — reemplazado por `LogSubscriber`
+- No loguear manualmente: `time`, `level`, `service`, `source`, `root_id`, `trace_id`, `correlation_id`, `sidekiq_job`, `task`
+- No referenciar `.gemini/` — obsoleto
+
+---
+
+## Compatibilidad Rails
+
+- **Reloading:** Usar `cache_classes?` helper (verifica `respond_to?(:enable_reloading)`) para Rails 7.1+
+- **Notifications:** Rails 7.1+ usa `all_listeners_for`, Rails 6/7.0 usa `listeners_for` — siempre usar `respond_to?` guards
+- **Soporte:** Rails 6, 7 y 8
+
+---
+
+## Integración Automática (Railtie)
+
+El `Railtie` en `after_initialize` detecta y auto-instrumenta sin intervención del desarrollador:
+
+| Gema detectada | Qué hace |
+|:---------------|:---------|
+| `BugBunny` | Registra `PublisherTracing` no — ese va en el cliente. Registra `ConsumerTracingMiddleware` y los hooks RPC |
+| `Sidekiq` | Registra client + server middleware |
+| `ActiveResource` | Prepend de `ActiveResourceInstrumentation` |
+| `Faraday` | Disponible como middleware opcional |
+
+---
+
+## Configuración Mínima
+
+```ruby
+# config/initializers/exis_ray.rb
+ExisRay.configure do |config|
+  config.log_format              = :json              # :text por defecto
+  config.trace_header            = 'HTTP_X_AMZN_TRACE_ID'
+  config.propagation_trace_header = 'X-Amzn-Trace-Id'
+  config.current_class           = 'Current'
+  config.reporter_class          = 'Reporter'
+end
+
+# BugBunny publisher — debe agregarse manualmente al cliente
+BugBunny::Client.new(pool: pool) do |stack|
+  stack.use ExisRay::BugBunny::PublisherTracing
+end
+```
+
+---
+
+## Testing en Consola
+
+```ruby
+# Inicializar trace context para probar desde rails console
+ExisRay::Tracer.hydrate(
+  trace_id: "Root=1-#{Time.now.to_i.to_s(16)}-#{SecureRandom.hex(12)}",
+  source: 'system'
+)
+```

@@ -34,9 +34,9 @@ RSpec.describe ExisRay::JsonFormatter do
         result = call({ event: "archive_lookup", cutoff: "2025-09-01" })
 
         expect(result).to include(
-          "event"   => "archive_lookup",
-          "cutoff"  => "2025-09-01",
-          "level"   => "INFO",
+          "event" => "archive_lookup",
+          "cutoff" => "2025-09-01",
+          "level" => "INFO",
           "service" => "test-service"
         )
         expect(result).not_to have_key("message")
@@ -54,9 +54,9 @@ RSpec.describe ExisRay::JsonFormatter do
         result = call("event=archive_lookup cutoff=2025-09-01")
 
         expect(result).to include(
-          "event"   => "archive_lookup",
-          "cutoff"  => "2025-09-01",
-          "level"   => "INFO",
+          "event" => "archive_lookup",
+          "cutoff" => "2025-09-01",
+          "level" => "INFO",
           "service" => "test-service"
         )
         expect(result).not_to have_key("message")
@@ -90,10 +90,10 @@ RSpec.describe ExisRay::JsonFormatter do
         result = call("component=orders event=invoice_generated duration_ms=42.5 retries=0")
 
         expect(result).to include(
-          "component"   => "orders",
-          "event"       => "invoice_generated",
+          "component" => "orders",
+          "event" => "invoice_generated",
           "duration_ms" => 42.5,
-          "retries"     => 0
+          "retries" => 0
         )
       end
 
@@ -140,6 +140,55 @@ RSpec.describe ExisRay::JsonFormatter do
         expect(result["service"]).to eq("test-service")
       end
     end
+
+    describe "inyeccion de contexto de negocio" do
+      let(:current_mock) do
+        Class.new do
+          attr_accessor :user_id, :isp_id, :correlation_id
+
+          def initialize(user_id:, isp_id:, correlation_id:)
+            @user_id = user_id
+            @isp_id = isp_id
+            @correlation_id = correlation_id
+          end
+
+          def respond_to?(method, *)
+            %i[user_id isp_id correlation_id].include?(method)
+          end
+        end
+      end
+
+      before do
+        allow(ExisRay).to receive(:current_class).and_return(nil)
+      end
+
+      it "incluye user_id=0 en el payload (no debe filtrarse)" do
+        allow(ExisRay).to receive(:current_class).and_return(current_mock.new(user_id: 0, isp_id: nil,
+                                                                              correlation_id: nil))
+
+        result = call("event=test")
+
+        expect(result["user_id"]).to eq(0)
+      end
+
+      it "incluye isp_id=0 en el payload (no debe filtrarse)" do
+        allow(ExisRay).to receive(:current_class).and_return(current_mock.new(user_id: nil, isp_id: 0,
+                                                                              correlation_id: nil))
+
+        result = call("event=test")
+
+        expect(result["isp_id"]).to eq(0)
+      end
+
+      it "no incluye nil user_id en el payload" do
+        allow(ExisRay).to receive(:current_class).and_return(current_mock.new(user_id: nil, isp_id: nil,
+                                                                              correlation_id: nil))
+
+        result = call("event=test")
+
+        expect(result).not_to have_key("user_id")
+      end
+    end
   end
 
   describe "#kv_string? (privado)" do
@@ -155,16 +204,16 @@ RSpec.describe ExisRay::JsonFormatter do
   end
 
   describe "#parse_kv_string (privado)" do
-    it "retorna un hash con claves symbol y valores casteados" do
+    it "retorna un hash con claves string y valores casteados" do
       result = formatter.send(:parse_kv_string, "a=1 b=2")
 
-      expect(result).to eq({ a: 1, b: 2 })
+      expect(result).to eq({ "a" => 1, "b" => 2 })
     end
 
     it "desenvuelve las comillas dobles de los valores" do
       result = formatter.send(:parse_kv_string, 'msg="hello world"')
 
-      expect(result).to eq({ msg: "hello world" })
+      expect(result).to eq({ "msg" => "hello world" })
     end
   end
 
@@ -178,8 +227,8 @@ RSpec.describe ExisRay::JsonFormatter do
 
     it "filtra claves sensibles en hashes anidados" do
       result = formatter.send(:filter_sensitive_hash, {
-        db: { host: "localhost", token: "abc123" }
-      })
+                                db: { host: "localhost", token: "abc123" }
+                              })
 
       expect(result[:db][:host]).to eq("localhost")
       expect(result[:db][:token]).to eq("[FILTERED]")
@@ -187,8 +236,8 @@ RSpec.describe ExisRay::JsonFormatter do
 
     it "filtra claves sensibles dentro de arrays de hashes" do
       result = formatter.send(:filter_sensitive_hash, {
-        users: [{ name: "gabriel", password: "secret" }, { name: "ana", password: "other" }]
-      })
+                                users: [{ name: "gabriel", password: "secret" }, { name: "ana", password: "other" }]
+                              })
 
       expect(result[:users][0][:name]).to eq("gabriel")
       expect(result[:users][0][:password]).to eq("[FILTERED]")
@@ -196,15 +245,15 @@ RSpec.describe ExisRay::JsonFormatter do
     end
 
     it "filtra claves sensibles en arrays primitivos cuando la clave padre es sensible" do
-      result = formatter.send(:filter_sensitive_hash, { tokens: ["abc", "def"] })
+      result = formatter.send(:filter_sensitive_hash, { tokens: %w[abc def] })
 
       expect(result[:tokens]).to eq(["[FILTERED]", "[FILTERED]"])
     end
 
     it "no altera valores no sensibles en arrays" do
-      result = formatter.send(:filter_sensitive_hash, { tags: ["admin", "active"] })
+      result = formatter.send(:filter_sensitive_hash, { tags: %w[admin active] })
 
-      expect(result[:tags]).to eq(["admin", "active"])
+      expect(result[:tags]).to eq(%w[admin active])
     end
   end
 end

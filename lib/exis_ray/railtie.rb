@@ -13,7 +13,13 @@ module ExisRay
     # Intercepta las peticiones entrantes para hidratar el Tracer.
     initializer "exis_ray.configure_middleware" do |app|
       require "exis_ray/http_middleware"
-      app.middleware.insert_after ActionDispatch::RequestId, ExisRay::HttpMiddleware
+      if app.middleware.respond_to?(:include?) && app.middleware.include?(ActionDispatch::RequestId)
+        app.middleware.insert_after ActionDispatch::RequestId, ExisRay::HttpMiddleware
+      else
+        app.middleware.use ExisRay::HttpMiddleware
+      end
+    rescue NoMethodError
+      app.middleware.use ExisRay::HttpMiddleware
     end
 
     # 2. Configuración de Estrategia de Logging
@@ -32,6 +38,25 @@ module ExisRay
     # 3. Integraciones Post-Boot y Forzado de Formateadores
     # Se ejecuta una vez que las gemas y el entorno de Rails están completamente cargados.
     config.after_initialize do
+      # Validación de configuración: solo cuando eager_load=true (producción/staging),
+      # donde todos los constantes de app/ están garantizados. En desarrollo con lazy
+      # loading las clases pueden no estar cargadas aún en este punto.
+      if Rails.application.config.eager_load
+        if (name = ExisRay.configuration.current_class).present?
+          klass = name.safe_constantize
+          unless klass&.<=(ExisRay::Current)
+            raise "ExisRay: current_class '#{name}' not found or doesn't inherit from ExisRay::Current"
+          end
+        end
+
+        if (name = ExisRay.configuration.reporter_class).present?
+          klass = name.safe_constantize
+          unless klass&.<=(ExisRay::Reporter)
+            raise "ExisRay: reporter_class '#{name}' not found or doesn't inherit from ExisRay::Reporter"
+          end
+        end
+      end
+
       # Aplicamos el formateador JSON globalmente al logger ya instanciado de Rails
       if ExisRay.configuration.json_logs? && Rails.logger
         Rails.logger.formatter = ExisRay::JsonFormatter.new
@@ -72,8 +97,10 @@ module ExisRay
       # --- Instrumentación de ActiveResource ---
       if defined?(ActiveResource::Base)
         require "exis_ray/active_resource_instrumentation"
-        ActiveResource::Base.send(:prepend, ExisRay::ActiveResourceInstrumentation)
-        log_boot("component=exis_ray event=active_resource_instrumented")
+        unless ActiveResource::Base.ancestors.include?(ExisRay::ActiveResourceInstrumentation)
+          ActiveResource::Base.prepend ExisRay::ActiveResourceInstrumentation
+          log_boot("component=exis_ray event=active_resource_instrumented")
+        end
       end
 
       # --- Instrumentación de Sidekiq ---
@@ -96,9 +123,7 @@ module ExisRay
           end
         end
 
-        if ExisRay.configuration.json_logs? && ::Sidekiq.logger
-          ::Sidekiq.logger.formatter = ExisRay::JsonFormatter.new
-        end
+        ::Sidekiq.logger.formatter = ExisRay::JsonFormatter.new if ExisRay.configuration.json_logs? && ::Sidekiq.logger
         log_boot("component=exis_ray event=sidekiq_instrumented")
       end
     end

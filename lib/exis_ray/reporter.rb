@@ -1,4 +1,6 @@
-require 'active_support/current_attributes'
+# frozen_string_literal: true
+
+require "active_support/current_attributes"
 
 module ExisRay
   # Clase base híbrida para reporte de errores.
@@ -33,11 +35,15 @@ module ExisRay
       add_tags(exception: excep.class.to_s)
 
       Rails.logger.error(excep.full_message) unless Rails.env.production?
-
-      if report_to_new_sentry?
-        exception_to_new_sentry(excep)
-      else
-        exception_to_old_sentry(excep)
+    rescue StandardError
+    ensure
+      begin
+        if report_to_new_sentry?
+          exception_to_new_sentry(excep)
+        else
+          exception_to_old_sentry(excep)
+        end
+      rescue StandardError
       end
     end
 
@@ -57,6 +63,7 @@ module ExisRay
 
     def self.add_tags(attrs)
       return if attrs.blank?
+
       self.tags = (tags || {}).merge(attrs.as_json)
     end
 
@@ -77,12 +84,10 @@ module ExisRay
       ::Session.tags_context ||= {}
 
       if fingerprint.present?
-        str_fingerprint = fingerprint.flatten.join(',')
+        str_fingerprint = fingerprint.flatten.join(",")
         ::Session.tags_context.merge!(fingerprint: str_fingerprint)
       end
-      if transaction_name.present?
-        ::Session.tags_context.merge!(transaction_name: transaction_name)
-      end
+      ::Session.tags_context.merge!(transaction_name: transaction_name) if transaction_name.present?
       ::Session.tags_context.merge!(tags) if tags.present?
     end
 
@@ -103,10 +108,10 @@ module ExisRay
       session_tag!
       session_context!
 
-      if defined?(Sentry)
-        Sentry.populate_context(contexts) if contexts.present?
-        Sentry.notify(exception)
-      end
+      return unless defined?(Sentry)
+
+      Sentry.populate_context(contexts) if contexts.present?
+      Sentry.notify(exception)
     end
 
     # --- Lógica Moderna ---
@@ -120,7 +125,7 @@ module ExisRay
     end
 
     def self.exception_to_new_sentry(exception)
-      send_to_new_sentry { Sentry.capture_exception(exception, level: 'error', fingerprint: fingerprint) }
+      send_to_new_sentry { Sentry.capture_exception(exception, level: "error", fingerprint: fingerprint) }
     end
 
     def self.send_to_new_sentry
@@ -155,29 +160,27 @@ module ExisRay
     def self.build_from_tracer
       return unless defined?(ExisRay::Tracer)
 
-      if ExisRay::Tracer.root_id.present?
-        add_tags(correlation_id: ExisRay::Tracer.root_id)
-        add_context(trace: {
-          root_id: ExisRay::Tracer.root_id,
-          request_id: ExisRay::Tracer.request_id
-        })
-      end
+      return unless ExisRay::Tracer.root_id.present?
+
+      add_tags(correlation_id: ExisRay::Tracer.root_id)
+      add_context(trace: {
+                    root_id: ExisRay::Tracer.root_id,
+                    request_id: ExisRay::Tracer.request_id
+                  })
     end
 
     def self.build_from_current
       klass = ExisRay.current_class
       return unless klass
 
-      add_tags(user_id: klass.user_id) if klass.respond_to?(:user_id?) && klass.user_id?
-      add_tags(isp_id: klass.isp_id)   if klass.respond_to?(:isp_id?)  && klass.isp_id?
+      add_tags(user_id: klass.user_id) if klass.respond_to?(:user_id) && !klass.user_id.nil?
+      add_tags(isp_id: klass.isp_id)   if klass.respond_to?(:isp_id)  && !klass.isp_id.nil?
 
-      if klass.respond_to?(:user) && klass.user.present?
-        add_context(user: sentry_user_context(klass))
-      end
+      add_context(user: sentry_user_context(klass)) if klass.respond_to?(:user) && klass.user
 
-      if klass.respond_to?(:isp) && klass.isp.present?
-        add_context(isp: sentry_isp_context(klass))
-      end
+      return unless klass.respond_to?(:isp) && klass.isp
+
+      add_context(isp: sentry_isp_context(klass))
     end
 
     # Hook para que la app host controle qué datos del usuario se envían a Sentry.

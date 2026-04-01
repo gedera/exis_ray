@@ -1,4 +1,6 @@
-require 'active_support/current_attributes'
+# frozen_string_literal: true
+
+require "active_support/current_attributes"
 
 module ExisRay
   # Clase base para la gestión del contexto de negocio (User, ISP, Correlation).
@@ -6,14 +8,10 @@ module ExisRay
   class Current < ActiveSupport::CurrentAttributes
     attribute :user_id, :isp_id, :correlation_id
 
-    # Sentinel para distinguir "no consultado" de "consultado y no encontrado".
-    # Evita re-queries a la DB cuando el objeto no existe.
-    NOT_FOUND = Object.new.freeze
-
     # Callback nativo de Rails: Se ejecuta automáticamente al llamar a Current.reset
     resets do
-      @user = NOT_FOUND
-      @isp  = NOT_FOUND
+      @user_object = nil
+      @isp_object = nil
 
       if defined?(PaperTrail)
         PaperTrail.request.whodunnit = nil
@@ -21,107 +19,99 @@ module ExisRay
       end
 
       if defined?(ActiveResource::Base)
-        ActiveResource::Base.headers.delete('UserId')
-        ActiveResource::Base.headers.delete('IspId')
-        ActiveResource::Base.headers.delete('CorrelationId')
+        ActiveResource::Base.headers.delete("UserId")
+        ActiveResource::Base.headers.delete("IspId")
+        ActiveResource::Base.headers.delete("CorrelationId")
       end
     end
 
     # --- Setters con Hooks ---
 
     def user_id=(id)
+      @user_object = nil
       super
-      if defined?(ActiveResource::Base)
-        ActiveResource::Base.headers['UserId'] = sanitize_header_value(id)
-      end
-      if defined?(PaperTrail)
-        PaperTrail.request.whodunnit = id
-      end
+      ActiveResource::Base.headers["UserId"] = sanitize_header_value(id) if defined?(ActiveResource::Base)
+      return unless defined?(PaperTrail)
+
+      PaperTrail.request.whodunnit = id
     end
 
     def isp_id=(id)
+      @isp_object = nil
       super
-      @isp = NOT_FOUND # Invalida cache
-      if defined?(ActiveResource::Base)
-        ActiveResource::Base.headers['IspId'] = sanitize_header_value(id)
-      end
+      return unless defined?(ActiveResource::Base)
+
+      ActiveResource::Base.headers["IspId"] = sanitize_header_value(id)
     end
 
     def correlation_id=(id)
       super
-
-      if defined?(::Session)
-        ::Session.request_id = id # Deprecated legacy support
-      end
-
-      if defined?(ActiveResource::Base)
-        ActiveResource::Base.headers['CorrelationId'] = sanitize_header_value(id)
-      end
-
-      if defined?(PaperTrail)
-        PaperTrail.request.controller_info = { correlation_id: id }
-      end
-
-      # Integración con el Reporter configurado
-      if (reporter = ExisRay.reporter_class) && reporter.respond_to?(:add_tags)
-        reporter.add_tags(correlation_id: id)
-      end
+      assign_session_request_id(id)
+      ActiveResource::Base.headers["CorrelationId"] = sanitize_header_value(id) if defined?(ActiveResource::Base)
+      PaperTrail.request.controller_info = { correlation_id: id } if defined?(PaperTrail)
+      sync_reporter_correlation_id(id)
     end
 
-    # --- Helpers de Objetos (Lazy Loading) ---
-    # Estos métodos asumen que la app host tiene modelos ::User e ::Isp
+    # --- Helpers de Objetos (Lazy Loading con cache por request) ---
+    # Estos métodos asumen que la app host tiene modelos ::User e ::Isp.
+    # Memoizan el objeto en @user_object/@isp_object, que se limpian en el bloque
+    # resets al final de cada request/job, y al asignar un nuevo user_id/isp_id.
 
     def user=(object)
-      @user = object || NOT_FOUND
       self.user_id = object&.id
     end
 
     def user
-      @user = NOT_FOUND unless defined?(@user)
-      return nil if @user.equal?(NOT_FOUND) && !user_id
+      return nil if user_id.nil?
+      return nil unless defined?(::User) && ::User.respond_to?(:find_by)
 
-      if @user.equal?(NOT_FOUND)
-        @user = (defined?(::User) && ::User.respond_to?(:find_by) ? ::User.find_by(id: user_id) : nil) || NOT_FOUND
-      end
-
-      @user.equal?(NOT_FOUND) ? nil : @user
+      @user_object ||= ::User.find_by(id: user_id)
     end
 
     def isp=(object)
-      @isp = object || NOT_FOUND
       self.isp_id = object&.id
     end
 
     def isp
-      @isp = NOT_FOUND unless defined?(@isp)
-      return nil if @isp.equal?(NOT_FOUND) && !isp_id
+      return nil if isp_id.nil?
+      return nil unless defined?(::Isp) && ::Isp.respond_to?(:find_by)
 
-      if @isp.equal?(NOT_FOUND)
-        @isp = (defined?(::Isp) && ::Isp.respond_to?(:find_by) ? ::Isp.find_by(id: isp_id) : nil) || NOT_FOUND
-      end
-
-      @isp.equal?(NOT_FOUND) ? nil : @isp
+      @isp_object ||= ::Isp.find_by(id: isp_id)
     end
 
     def user?
-      user_id.present?
+      !user_id.nil?
     end
 
     def isp?
-      isp_id.present?
+      !isp_id.nil?
     end
 
+    # Usa present? intencionalmente: un string vacío no es un correlation_id válido,
+    # a diferencia de user_id/isp_id donde 0 es un valor legítimo.
     def correlation_id?
       correlation_id.present?
     end
 
     private
 
-    # Elimina caracteres CRLF para prevenir HTTP header injection.
-    # Un valor con "\r\n" en un header de ActiveResource podría inyectar
-    # headers arbitrarios en requests hacia otros microservicios.
+    def assign_session_request_id(id)
+      return unless defined?(::Session)
+
+      ::Session.request_id = id
+    rescue StandardError
+    end
+
+    def sync_reporter_correlation_id(id)
+      reporter = ExisRay.reporter_class
+      return unless reporter.respond_to?(:add_tags)
+
+      reporter.add_tags(correlation_id: id)
+    rescue StandardError
+    end
+
     def sanitize_header_value(value)
-      value.to_s.gsub(/[\r\n]/, '')
+      value.to_s.gsub(/[\r\n]/, "")
     end
   end
 end

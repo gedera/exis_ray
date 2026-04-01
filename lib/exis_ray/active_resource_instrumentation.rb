@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ExisRay
   # Módulo diseñado para interceptar e instrumentar las peticiones HTTP salientes realizadas con ActiveResource.
   # Utiliza el patrón `prepend` para envolver el método `headers` original sin romper la cadena de herencia.
@@ -14,27 +16,22 @@ module ExisRay
     #
     # @return [Hash] Un hash de headers HTTP que incluye el header de trazabilidad si corresponde.
     def headers
-      # 1. Obtenemos los headers originales (si los hay)
       original_headers = super
+      return original_headers unless ExisRay::Tracer.root_id.present?
 
-      # 2. Verificación Universal:
-      # Usamos `root_id` en lugar de `trace_id`.
-      # - trace_id: Solo existe si recibimos una petición Web (viene del header entrante).
-      # - root_id: Existe SIEMPRE que haya traza (sea Web o sea un Cron generado por TaskMonitor).
-      if ExisRay::Tracer.root_id.present?
-        # Generamos el string propagable: "Root=...;Parent=...;Sampled=..."
-        trace_header_value = ExisRay::Tracer.generate_trace_header
+      inject_trace_header(original_headers)
+    rescue StandardError
+      original_headers
+    end
 
-        # Usamos el header de propagación (formato HTTP, ej: 'X-Amzn-Trace-Id'),
-        # NO el trace_header que es formato Rack (HTTP_X_AMZN_TRACE_ID) para lectura entrante.
-        trace_header_key = ExisRay.configuration.propagation_trace_header
+    private
 
-        # Retornamos un nuevo hash combinado (merge) para no mutar el original por error
-        original_headers.merge(trace_header_key => trace_header_value)
-      else
-        # Si no hay traza activa, devolvemos los headers tal cual
-        original_headers
-      end
+    def inject_trace_header(original_headers)
+      trace_header_value = ExisRay::Tracer.generate_trace_header
+      trace_header_key = ExisRay.configuration.propagation_trace_header
+      original_headers.merge(trace_header_key => trace_header_value)
+    rescue StandardError
+      original_headers
     end
   end
 end

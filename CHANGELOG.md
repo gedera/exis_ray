@@ -1,3 +1,31 @@
+## [0.5.10] - 2026-04-01
+
+### Fixed
+- **Thread-safety:** Removed unsafe instance variable caching of `@user`/`@isp` in `Current`. Objects are now queried directly on each access.
+- **BugBunny Consumer cleanup:** `ConsumerTracingMiddleware` now properly cleans up `Current` and `Reporter` in addition to `Tracer` in the ensure block.
+- **JsonFormatter crash prevention:** Added rescue block with fallback message to prevent logging failures from crashing requests.
+- **Filter sensitive hash cycle detection:** Added `visited` array to detect and prevent infinite recursion with circular references.
+- **FaradayMiddleware rescue:** Wrapped header injection in rescue to prevent crashes on malformed headers.
+- **ActiveResourceInstrumentation rescue:** Wrapped header injection in rescue to prevent crashes on malformed headers.
+- **Session isolation:** `assign_session_request_id` helper with rescue prevents global state pollution from failing Session writes.
+- **Sidekiq ServerMiddleware sync:** Added `ExisRay.sync_correlation_id` call after hydrating tracer.
+- **Sidekiq trace_id empty string:** Changed to `trace_header.present?` check to handle empty strings.
+- **Safe middleware insertion:** Added `respond_to?` check for `include?` to handle Rails 8's `MiddlewareStackProxy`.
+- **Symbol allocation optimization:** Changed to string keys in `parse_kv_string` to avoid memory leaks.
+- **Sidekiq ClientMiddleware rescue:** Trace injection now wrapped in ensure block with rescue.
+- **LogSubscriber double-attach:** Added `attached?` check to prevent multiple subscriber registrations.
+- **LogSubscriber fallback:** Improved error handling with structured fallback message when build_payload fails.
+- **user_id=0 preserved:** Changed `.present?` to `!.nil?` checks in `Current`, `JsonFormatter`, and `Reporter` to preserve 0 values.
+- **ActiveResource idempotent prepend:** Added ancestor check before prepending instrumentation.
+- **Parser handles malformed headers:** `parse_trace_id` now skips parts without `=` instead of crashing.
+- **Reporter rescue/ensure structure:** Sentry reporting now wrapped in nested begin/rescue to prevent crashes.
+- **HttpMiddleware rescue:** Added rescue to prevent crashes on malformed trace headers.
+- **TaskMonitor Rails.logger guard:** Added `defined?(Rails) && Rails.logger` check.
+- **ServerMiddleware queue nil guard:** Safe access with `&.` for `get_sidekiq_options`.
+- **JsonFormatter timestamp nil:** Added safe navigation with fallback `Time.now` for nil timestamps.
+- **Sidekiq cleanup rescue:** Extracted `cleanup_current`/`cleanup_reporter` with individual rescue blocks.
+- **Current#user/#isp object lookup:** Changed from `.present?` to `!.nil?` to allow user_id=0 lookups.
+
 ## [0.5.9] - 2026-03-31
 
 ### Fixed

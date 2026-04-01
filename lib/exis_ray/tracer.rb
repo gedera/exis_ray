@@ -1,5 +1,7 @@
-require 'active_support/current_attributes'
-require 'securerandom'
+# frozen_string_literal: true
+
+require "active_support/current_attributes"
+require "securerandom"
 
 module ExisRay
   # Gestiona el contexto de trazabilidad distribuida (Distributed Tracing).
@@ -10,7 +12,8 @@ module ExisRay
   #
   # @see https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html Documentación de AWS X-Ray
   class Tracer < ActiveSupport::CurrentAttributes
-    attribute :trace_id, :request_id, :root_id, :self_id, :called_from, :total_time_so_far, :created_at, :sidekiq_job, :task, :source
+    attribute :trace_id, :request_id, :root_id, :self_id, :called_from, :total_time_so_far, :created_at, :sidekiq_job,
+              :task, :source
 
     # Devuelve el nombre de la aplicación en snake_case (ej: "cold_storage_service").
     # Se utiliza como identificador global del servicio en logs y trazabilidad.
@@ -37,21 +40,25 @@ module ExisRay
     def self.parse_trace_id
       return unless trace_id.present?
 
-      # Fallback para desarrollo: Si el header no trae Root, generamos uno nuevo.
-      self.trace_id = generate_new_root(trace_id) if trace_id.exclude?('Root')
+      self.trace_id = generate_new_root(trace_id) if trace_id.exclude?("Root")
 
-      # Parseo a Hash
-      data = trace_id.split(';').map { |part| part.split('=', 2) }.to_h
+      data = {}
+      trace_id.split(";").each do |part|
+        key_value = part.split("=", 2)
+        next unless key_value.size == 2
 
-      self.root_id     = data['Root']
-      self.self_id     = data['Self']
-      self.called_from = data['CalledFrom']
-
-      if data['TotalTimeSoFar']
-        self.total_time_so_far = data['TotalTimeSoFar'].gsub(/ms$/i, '').to_i
-      else
-        self.total_time_so_far = 0
+        data[key_value[0]] = key_value[1]
       end
+
+      self.root_id     = data["Root"]
+      self.self_id     = data["Self"]
+      self.called_from = data["CalledFrom"]
+
+      self.total_time_so_far = if data["TotalTimeSoFar"]
+                                 data["TotalTimeSoFar"].gsub(/ms$/i, "").to_i
+                               else
+                                 0
+                               end
     end
 
     # Calcula el tiempo transcurrido en milisegundos desde el inicio de la request.
@@ -81,6 +88,7 @@ module ExisRay
     # @return [Float] Duración en segundos.
     def self.current_duration_s
       return 0.0 unless created_at
+
       (Process.clock_gettime(Process::CLOCK_MONOTONIC) - created_at).round(4)
     end
 
@@ -106,7 +114,7 @@ module ExisRay
     # @return [String] Header formateado: "Root=...;Self=...;CalledFrom=...;TotalTimeSoFar=...ms"
     def self.generate_trace_header
       safe_root = if root_id.present?
-                    root_id.start_with?('Root=') ? root_id : "Root=#{root_id}"
+                    root_id.start_with?("Root=") ? root_id : "Root=#{root_id}"
                   else
                     generate_new_root
                   end
@@ -131,7 +139,7 @@ module ExisRay
         # Codificamos los bytes del string a hex para preservar unicidad
         # independientemente de si el sufijo es numérico o alfanumérico.
         # Ej: "worker01" → "776f726b657230 31", "abc" → "616263"
-        suffix_hex = suffix_id.to_s.bytes.map { |b| b.to_s(16).rjust(2, '0') }.join.first(8).rjust(8, '0')
+        suffix_hex = suffix_id.to_s.bytes.map { |b| b.to_s(16).rjust(2, "0") }.join.first(8).rjust(8, "0")
         unique_part = SecureRandom.hex(8) + suffix_hex
       else
         unique_part = SecureRandom.hex(12)
@@ -145,7 +153,7 @@ module ExisRay
     # @api private
     # @return [String]
     def self.clean_request_id
-      (request_id || SecureRandom.hex).delete('-').first(24)
+      (request_id || SecureRandom.hex).delete("-").first(24)
     end
 
     private_class_method :clean_request_id, :generate_new_root

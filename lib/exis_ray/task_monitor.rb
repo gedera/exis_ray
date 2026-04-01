@@ -13,7 +13,7 @@ module ExisRay
     # @yield El bloque de código que representa la lógica de la tarea.
     # @raise [StandardError] Re-lanza cualquier excepción ocurrida tras registrarla.
     # @return [void]
-    def self.run(task_name)
+    def self.run(task_name, &block)
       setup_tracer(task_name)
 
       short_name = task_name.to_s.split(":").last
@@ -32,17 +32,19 @@ module ExisRay
       log_event(:info, "component=exis_ray event=task_started task=#{task_name} status=started")
 
       # Bloque de ejecución con o sin tags dependiendo de la configuración
-      execute_with_optional_tags { yield }
+      execute_with_optional_tags(&block)
 
       duration_s = ExisRay::Tracer.current_duration_s
       human_time = ExisRay::Tracer.format_duration(duration_s)
 
-      log_event(:info, "component=exis_ray event=task_finished task=#{task_name} status=success duration_s=#{duration_s} duration_human=\"#{human_time}\"")
+      log_event(:info,
+                "component=exis_ray event=task_finished task=#{task_name} status=success duration_s=#{duration_s} duration_human=\"#{human_time}\"")
     rescue StandardError => e
       duration_s = ExisRay::Tracer.current_duration_s
       human_time = ExisRay::Tracer.format_duration(duration_s)
 
-      log_event(:error, "component=exis_ray event=task_finished task=#{task_name} status=failed duration_s=#{duration_s} duration_human=\"#{human_time}\" error_class=#{e.class} error_message=#{e.message.inspect}")
+      log_event(:error,
+                "component=exis_ray event=task_finished task=#{task_name} status=failed duration_s=#{duration_s} duration_human=\"#{human_time}\" error_class=#{e.class} error_message=#{e.message.inspect}")
       raise e
     ensure
       # Limpieza centralizada obligatoria para evitar filtraciones de memoria o contexto
@@ -81,9 +83,9 @@ module ExisRay
     #
     # @yield El bloque de ejecución de la tarea.
     # @return [void]
-    def self.execute_with_optional_tags
+    def self.execute_with_optional_tags(&block)
       if !ExisRay.configuration.json_logs? && Rails.logger.respond_to?(:tagged)
-        Rails.logger.tagged(ExisRay::Tracer.root_id) { yield }
+        Rails.logger.tagged(ExisRay::Tracer.root_id, &block)
       else
         yield
       end
@@ -96,9 +98,10 @@ module ExisRay
     # @param payload [Hash] Datos estructurados para el modo JSON.
     # @return [void]
     def self.log_event(level, message)
+      return unless defined?(Rails) && Rails.logger
+
       Rails.logger.send(level, message)
     rescue StandardError
-      # El logger nunca debe interrumpir el flujo principal de la tarea.
     end
 
     private_class_method :get_pod_identifier, :setup_tracer, :execute_with_optional_tags, :log_event

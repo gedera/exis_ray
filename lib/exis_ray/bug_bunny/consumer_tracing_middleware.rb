@@ -25,7 +25,9 @@ module ExisRay
         setup_trace_context(properties)
         @app.call(delivery_info, properties, body)
       ensure
-        ExisRay::Tracer.reset rescue nil
+        safe_reset(ExisRay::Tracer)
+        safe_reset(ExisRay.current_class)
+        safe_reset(ExisRay.reporter_class)
       end
 
       private
@@ -40,16 +42,21 @@ module ExisRay
         trace_header = properties.headers&.[](ExisRay.configuration.propagation_trace_header)
 
         if trace_header.present?
-          ExisRay::Tracer.hydrate(trace_id: trace_header, source: 'system')
+          ExisRay::Tracer.hydrate(trace_id: trace_header, source: "system")
         else
           ExisRay::Tracer.created_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          ExisRay::Tracer.source     = 'system'
+          ExisRay::Tracer.source     = "system"
           ExisRay::Tracer.root_id    = ExisRay::Tracer.send(:generate_new_root)
         end
 
         ExisRay.sync_correlation_id
       rescue StandardError
         # El tracing nunca debe interrumpir el procesamiento del mensaje.
+      end
+
+      def safe_reset(obj)
+        obj.reset if obj.respond_to?(:reset)
+      rescue StandardError
       end
     end
   end

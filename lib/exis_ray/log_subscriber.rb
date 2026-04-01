@@ -32,14 +32,22 @@ module ExisRay
     # @return [void]
     def process_action(event)
       payload = build_payload(event)
-      # Usamos el nivel ERROR si el status es 5xx, cumpliendo el estándar de Gabriel.
       if payload[:status] && payload[:status] >= 500
         logger.error(payload)
       else
         logger.info(payload)
       end
-    rescue StandardError
-      # El logger nunca debe interrumpir el flujo del request.
+    rescue StandardError => e
+      begin
+        logger.error({
+                       component: "exis_ray",
+                       event: "log_subscriber_fallback",
+                       error: e.message,
+                       payload_summary: event.payload.slice(:controller, :action, :method, :path)
+                     })
+      rescue StandardError
+        nil
+      end
     end
 
     # Hook para que las subclases inyecten campos extra en cada log de request.
@@ -58,9 +66,17 @@ module ExisRay
     #
     # @return [void]
     def self.install!
+      return if attached?
+
       suppress_default_log_subscribers!
       suppress_rack_logger!
       subscriber_class.attach_to(:action_controller)
+    end
+
+    def self.attached?
+      ActiveSupport::LogSubscriber.log_subscribers.any? { |s| s.is_a?(subscriber_class) }
+    rescue StandardError
+      false
     end
 
     private
@@ -75,18 +91,18 @@ module ExisRay
       db_s       = payload[:db_runtime] ? (payload[:db_runtime] / 1000.0).round(4) : nil
 
       data = {
-        component:      "exis_ray",
-        event:          "http_request",
-        method:         payload[:method],
-        path:           payload[:path],
-        format:         payload[:format],
-        controller:     payload[:controller],
-        action:         payload[:action],
-        status:         status,
-        duration_s:     duration_s,
+        component: "exis_ray",
+        event: "http_request",
+        method: payload[:method],
+        path: payload[:path],
+        format: payload[:format],
+        controller: payload[:controller],
+        action: payload[:action],
+        status: status,
+        duration_s: duration_s,
         duration_human: ExisRay::Tracer.format_duration(duration_s),
         view_runtime_s: view_s,
-        db_runtime_s:   db_s
+        db_runtime_s: db_s
       }
 
       data.merge!(self.class.extra_fields(event))

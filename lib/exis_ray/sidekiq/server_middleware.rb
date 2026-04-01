@@ -18,27 +18,39 @@ module ExisRay
       # @param _queue [String] El nombre de la cola (ignorado).
       # @yield Ejecuta el bloque que procesa el job real.
       # @return [void]
-      def call(worker, job, _queue)
+      def call(worker, job, _queue, &block)
         hydrate_tracer(worker, job)
         hydrate_current(job)
         setup_reporter(worker)
 
-        # Ejecución adaptativa de logs
         if !ExisRay.configuration.json_logs? && Rails.logger.respond_to?(:tagged)
-          Rails.logger.tagged(ExisRay::Tracer.root_id) { yield }
+          Rails.logger.tagged(ExisRay::Tracer.root_id, &block)
         else
           yield
         end
       ensure
-        # Limpieza vital en Sidekiq para evitar fugas de contexto entre jobs en el mismo hilo.
         ExisRay::Tracer.reset
-        current  = ExisRay.current_class
-        reporter = ExisRay.reporter_class
-        current.reset  if current&.respond_to?(:reset)
-        reporter.reset if reporter&.respond_to?(:reset)
+        cleanup_current
+        cleanup_reporter
       end
 
       private
+
+      def cleanup_current
+        current = ExisRay.current_class
+        return unless current&.respond_to?(:reset)
+
+        current.reset
+      rescue StandardError
+      end
+
+      def cleanup_reporter
+        reporter = ExisRay.reporter_class
+        return unless reporter&.respond_to?(:reset)
+
+        reporter.reset
+      rescue StandardError
+      end
 
       # Configura el Tracer con el ID recibido en el payload o genera uno nuevo si no existe.
       #
@@ -48,15 +60,16 @@ module ExisRay
       def hydrate_tracer(worker, job)
         ExisRay::Tracer.sidekiq_job = worker.class.name
 
-        if job["exis_ray_trace"]
-          # Continuidad: Usamos la traza propagada desde el cliente (Web/Cron)
-          ExisRay::Tracer.hydrate(trace_id: job["exis_ray_trace"], source: "sidekiq")
+        trace_header = job["exis_ray_trace"]
+        if trace_header.present?
+          ExisRay::Tracer.hydrate(trace_id: trace_header, source: "sidekiq")
         else
-          # Origen: El job nació directamente aquí sin contexto previo
           ExisRay::Tracer.created_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           ExisRay::Tracer.source     = "sidekiq"
           ExisRay::Tracer.root_id    = ExisRay::Tracer.send(:generate_new_root)
         end
+
+        ExisRay.sync_correlation_id
       end
 
       # Hidrata la clase Current configurada con los datos de negocio del payload.
@@ -72,9 +85,9 @@ module ExisRay
         klass.user_id = ctx["user_id"] if ctx["user_id"] && klass.respond_to?(:user_id=)
         klass.isp_id  = ctx["isp_id"]  if ctx["isp_id"]  && klass.respond_to?(:isp_id=)
 
-        if ctx["correlation_id"] && klass.respond_to?(:correlation_id=)
-          klass.correlation_id = ctx["correlation_id"]
-        end
+        return unless ctx["correlation_id"] && klass.respond_to?(:correlation_id=)
+
+        klass.correlation_id = ctx["correlation_id"]
       end
 
       # Configura etiquetas y nombres de transacción en el Reporter (Sentry).
@@ -85,16 +98,22 @@ module ExisRay
         klass = ExisRay.reporter_class
         return unless klass
 
-        if klass.respond_to?(:transaction_name=)
-          klass.transaction_name = "Sidekiq/#{worker.class.name}"
-        end
+        klass.transaction_name = "Sidekiq/#{worker.class.name}" if klass.respond_to?(:transaction_name=)
 
         return unless klass.respond_to?(:add_tags)
 
-        klass.add_tags(
-          sidekiq_queue: worker.class.get_sidekiq_options["queue"],
-          retry_count: worker.respond_to?(:retry_count) ? worker.retry_count : 0
-        )
+        sidekiq_opts = worker.class.get_sidekiq_options
+        sidekiq_queue = sidekiq_opts&.[]("queue")
+        retry_count = if worker.respond_to?(:retry_count)
+                        worker.retry_count
+                      else
+                        0
+                      end
+
+        tags = { retry_count: retry_count }
+        tags[:sidekiq_queue] = sidekiq_queue if sidekiq_queue
+
+        klass.add_tags(tags)
       end
     end
   end

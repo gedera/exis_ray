@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "exis_ray/version"
 
 # Dependencias externas
@@ -102,7 +104,7 @@ module ExisRay
     # @return [void]
     def sync_correlation_id
       curr = current_class
-      return unless curr&.respond_to?(:correlation_id=) && Tracer.root_id.present?
+      return unless curr.respond_to?(:correlation_id=) && Tracer.root_id.present?
 
       curr.correlation_id = Tracer.correlation_id
     end

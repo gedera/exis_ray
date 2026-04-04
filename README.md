@@ -1,178 +1,238 @@
 # ExisRay
 
-**ExisRay** is a robust observability framework designed for Ruby on Rails microservices. It unifies **Distributed Tracing** (AWS X-Ray compatible), **Business Context Propagation**, **Error Reporting**, and **Structured JSON Logging** into a single, cohesive gem.
+Capa de observabilidad y trazabilidad distribuida para microservicios Rails del ecosistema Wispro. Unifica tracing (AWS X-Ray compatible), logging JSON estructurado, propagación de contexto de negocio y reporte de errores en una sola gema.
 
-It acts as the backbone of your architecture, ensuring that every request, background task (Sidekiq/Cron), log line, and external API call carries the necessary context to debug issues across a distributed system.
+## Features
 
-## 🚀 Features
+- **Distributed Tracing** — Parseo, generación y propagación automática de headers `X-Amzn-Trace-Id`.
+- **Structured JSON Logging** — Logs HTTP, Sidekiq y Rake en formato JSON single-line con contexto inyectado.
+- **Context Propagation** — `user_id`, `isp_id` y `correlation_id` viajan automáticamente entre servicios.
+- **Error Reporting** — Wrapper de Sentry que enriquece cada evento con trace context e identidad de negocio.
+- **Auto-instrumentación** — HTTP, Sidekiq, ActiveResource y BugBunny se configuran automáticamente via Railtie.
+- **Compatibilidad** — Ruby >= 2.6, Rails 6, 7 y 8.
 
-* **Distributed Tracing:** Automatically parses, generates, and propagates Trace headers (compatible with AWS ALB `X-Amzn-Trace-Id`).
-* **Structured JSON Logging:** Optionally unifies all your application logs (HTTP requests, Sidekiq jobs, and Rake tasks) into a clean, single-line JSON format, perfect for Datadog, ELK, or CloudWatch.
-* **Unified Tagging:** If JSON logging is disabled, it automatically injects the global `Root ID` into every Rails log line.
-* **Context Management:** Thread-safe storage for business identity (`User`, `ISP`, `CorrelationId`) with automatic cleanup.
-* **Error Reporting:** A wrapper for Sentry (Legacy & Modern SDKs) that enriches errors with the full trace and business context.
-* **Sidekiq Integration:** Automatic context propagation (User/ISP/Trace) and log formatting between the Enqueuer and the Worker.
-* **Task Monitor:** A specialized monitor for Rake/Cron tasks to initialize traces and format logs where no HTTP request exists.
-* **HTTP Clients:** Automatically patches `ActiveResource` and provides middleware for `Faraday`.
-* **BugBunny Integration:** Propagates the trace context across RabbitMQ message boundaries via a publisher middleware and a consumer concern.
+## Cómo funciona
 
----
+ExisRay opera en tres capas que se combinan automáticamente:
 
-## 📦 Installation
+```
+                          ┌─────────────────────────────────┐
+                          │         App Host (Rails)         │
+                          │  Current ← user_id, isp_id      │
+                          │  Reporter ← Sentry context       │
+                          └──────────────┬──────────────────┘
+                                         │
+              ┌──────────────────────────┼──────────────────────────┐
+              │                          │                          │
+     ┌────────▼────────┐      ┌─────────▼─────────┐     ┌─────────▼─────────┐
+     │  HTTP Request    │      │  Sidekiq Job       │     │  BugBunny Msg     │
+     │  HttpMiddleware  │      │  ServerMiddleware   │     │  ConsumerTracing  │
+     └────────┬────────┘      └─────────┬─────────┘     └─────────┬─────────┘
+              │                          │                          │
+              └──────────────────────────┼──────────────────────────┘
+                                         │
+                                         ▼
+                              ┌─────────────────────┐
+                              │   ExisRay::Tracer    │
+                              │  (CurrentAttributes) │
+                              │                      │
+                              │  root_id, trace_id,  │
+                              │  source, self_id,    │
+                              │  called_from,        │
+                              │  total_time_so_far   │
+                              └──────────┬──────────┘
+                                         │
+                         ┌───────────────┼───────────────┐
+                         │               │               │
+                         ▼               ▼               ▼
+                   JsonFormatter    FaradayMiddleware  PublisherTracing
+                   (logs + context) (HTTP saliente)   (RabbitMQ saliente)
+```
 
-Add this line to your application's Gemfile:
+**Flujo de propagación:**
+
+1. Un request/job/mensaje llega al servicio. El middleware correspondiente hidrata el `Tracer` con el header entrante (o genera un nuevo `root_id` si no trae uno).
+2. `JsonFormatter` inyecta automáticamente `root_id`, `trace_id`, `source` y el contexto de negocio (`user_id`, `isp_id`, `correlation_id`) en cada línea de log.
+3. Cuando el servicio llama a otro servicio (HTTP, Sidekiq, RabbitMQ), el middleware de salida genera un nuevo header con `Tracer.generate_trace_header`, que incluye el `root_id` original, el `self_id` del servicio actual, el `CalledFrom` y el tiempo acumulado.
+4. El servicio destino repite desde el paso 1. El `root_id` se mantiene constante a lo largo de toda la cadena.
+
+## Instalación
 
 ```ruby
 gem "exis_ray"
 ```
 
-And then execute:
+## Quick Start
 
-```bash
-$ bundle install
-```
-
-*(Note: ExisRay handles HTTP log condensation internally via `ExisRay::LogSubscriber`, compatible with Rails 6, 7 and 8. Lograge is no longer required).*
-
----
-
-## ⚙️ Configuration
-
-Create an initializer to configure the behavior. This is crucial to link ExisRay with your specific application logic.
-
-**File:** `config/initializers/exis_ray.rb`
+Configuración mínima para un servicio Rails nuevo:
 
 ```ruby
+# 1. Configurar ExisRay (config/initializers/exis_ray.rb)
 ExisRay.configure do |config|
-  # 1. Trace Header (Incoming)
-  # The HTTP header used to read the Trace ID from the Load Balancer (Rack format).
-  # Default: "HTTP_X_AMZN_TRACE_ID" (AWS Standard).
-  config.trace_header = "HTTP_X_WP_TRACE_ID"
-
-  # 2. Propagation Header (Outgoing)
-  # The header sent to downstream services via ActiveResource/Faraday.
-  config.propagation_trace_header = "X-Wp-Trace-Id"
-
-  # 3. Dynamic Classes (Required)
-  # Link your app's specific classes to the gem.
-  # We use Strings to avoid "uninitialized constant" errors during boot.
-  config.current_class  = "Current"   # Your Context Model
-  config.reporter_class = "Choto"     # Your Sentry Wrapper
-
-  # 4. Log Format (New!)
-  # Choose the output format for your application logs.
-  # Options: :text (default Rails behavior) or :json (Structured logging).
-  # Pro-tip: Make it dynamic based on the environment!
-  config.log_format = Rails.env.production? ? :json : :text
+  config.log_format     = Rails.env.production? ? :json : :text
+  config.current_class  = "Current"
+  config.reporter_class = "Reporter"
 end
-```
 
----
-
-## 📖 Implementation Guide
-
-### 1. Define Business Context (`Current`)
-
-Inherit from `ExisRay::Current` to manage your global state. This class handles thread-safety and ensures data is wiped after every request.
-
-**File:** `app/models/current.rb`
-
-```ruby
+# 2. Crear Current (app/models/current.rb)
 class Current < ExisRay::Current
-  # Add app-specific attributes here
-  attribute :billing_cycle, :permissions
+  # ExisRay provee: user_id, isp_id, correlation_id
+  # Agregar atributos específicos de la app:
+  attribute :permissions
+end
 
-  # ExisRay provides: user_id, isp_id, correlation_id
+# 3. Crear Reporter (app/models/reporter.rb)
+class Reporter < ExisRay::Reporter
+end
+
+# 4. Hidratar el Current en cada request (app/controllers/application_controller.rb)
+class ApplicationController < ActionController::Base
+  before_action :set_context
+
+  private
+
+  def set_context
+    Current.user = current_user if current_user
+    Current.isp_id = request.headers["X-Isp-Id"]
+  end
 end
 ```
 
-### 2. Define Error Reporter (`Reporter`)
+Con esto, ExisRay auto-instrumenta HTTP y Sidekiq (si está presente). Los logs en producción salen en JSON con trace context completo.
 
-Inherit from `ExisRay::Reporter` to standardize error handling. This wrapper automatically attaches the `Trace ID`, `User`, `ISP`, and `Tags` to every Sentry event.
-
-**File:** `app/models/choto.rb`
+## Configuración
 
 ```ruby
-class Choto < ExisRay::Reporter
-  # Optional hook to add service-specific context
+# config/initializers/exis_ray.rb
+ExisRay.configure do |config|
+  # Header entrante (formato Rack). Default: "HTTP_X_AMZN_TRACE_ID"
+  config.trace_header = "HTTP_X_AMZN_TRACE_ID"
+
+  # Header saliente (formato HTTP). Default: "X-Amzn-Trace-Id"
+  config.propagation_trace_header = "X-Amzn-Trace-Id"
+
+  # Clases de la app host (strings para evitar problemas de autoloading)
+  config.current_class  = "Current"    # hereda de ExisRay::Current
+  config.reporter_class = "Reporter"   # hereda de ExisRay::Reporter
+
+  # Formato de logs: :text (default) o :json
+  config.log_format = Rails.env.production? ? :json : :text
+
+  # Subclase de LogSubscriber para campos HTTP extra (opcional)
+  # config.log_subscriber_class = "MyLogSubscriber"
+end
+```
+
+## Clases de la App Host
+
+### Current (contexto de negocio)
+
+`ExisRay::Current` extiende `ActiveSupport::CurrentAttributes` y provee tres atributos base: `user_id`, `isp_id` y `correlation_id`. Al asignarlos, propaga automáticamente a PaperTrail (`whodunnit`), ActiveResource (headers) y Reporter (tags de Sentry).
+
+```ruby
+# app/models/current.rb
+class Current < ExisRay::Current
+  # Atributos heredados: user_id, isp_id, correlation_id
+  # Helpers heredados: user, user=, isp, isp=, user?, isp?, correlation_id?
+  #
+  # Agregar atributos específicos de la app:
+  attribute :permissions
+end
+```
+
+**Helpers disponibles:**
+
+| Método | Descripción |
+|:-------|:------------|
+| `Current.user = object` | Asigna `user_id` desde `object.id` |
+| `Current.user` | Lazy-loads `::User.find_by(id: user_id)` (cacheado por request) |
+| `Current.isp = object` | Asigna `isp_id` desde `object.id` |
+| `Current.isp` | Lazy-loads `::Isp.find_by(id: isp_id)` (cacheado por request) |
+| `Current.user?` / `Current.isp?` | Predicate: true si el ID no es nil |
+| `Current.correlation_id?` | Predicate: true si está presente (no vacío) |
+
+### Reporter (reporte de errores)
+
+`ExisRay::Reporter` es un wrapper de Sentry que enriquece automáticamente cada evento con el trace context del `Tracer` y el contexto de negocio del `Current`. Soporta Sentry SDK moderno y legacy (Raven/Session).
+
+```ruby
+# app/models/reporter.rb
+class Reporter < ExisRay::Reporter
+  # Hook opcional para contexto adicional en Sentry
   def self.build_custom_context
-    if ExisRay.current_class.respond_to?(:olt)
-      add_tags(olt_id: ExisRay.current_class.olt&.id)
-    end
+    add_tags(plan: ExisRay.current_class.isp&.plan)
   end
-end
-```
 
-#### Controlling what user/ISP data is sent to Sentry
-
-By default, ExisRay only sends `{ id: }` to Sentry for both user and ISP contexts. This is intentional — sending `user.as_json` without restrictions would expose sensitive attributes (`password_digest`, `reset_password_token`, etc.) to a third-party service.
-
-To include additional fields, override the hooks in your subclass:
-
-```ruby
-class Choto < ExisRay::Reporter
+  # Hook opcional para controlar qué datos del usuario se envían a Sentry.
+  # Default: solo { id: current.user_id }
   def self.sentry_user_context(current)
-    { id: current.user_id, email: current.user&.email, role: current.user&.role }
-  end
-
-  def self.sentry_isp_context(current)
-    { id: current.isp_id, name: current.isp&.name }
+    { id: current.user_id, email: current.user&.email }
   end
 end
 ```
 
-> **Important:** never include attributes like `password_digest`, tokens, or secrets in these methods.
-
-### 3. Hydrate Context (Controller)
-
-In your `ApplicationController`, verify the incoming request and set the context. ExisRay handles the Trace ID automatically, you just handle the Business Logic.
-
-**File:** `app/controllers/application_controller.rb`
+**API pública:**
 
 ```ruby
-before_action :set_exis_ray_context
+# Reportar un mensaje
+Reporter.report("algo inesperado", context: { order_id: 123 }, tags: { severity: "high" })
 
-def set_exis_ray_context
-  # 1. User Context (e.g., from Devise)
-  Current.user = current_user if current_user
+# Reportar una excepción
+Reporter.exception(error, context: { order_id: 123 }, fingerprint: ["order-failure"])
 
-  # 2. ISP Context (e.g., from Headers)
-  Current.isp_id = request.headers["X-Isp-Id"]
+# Acumular contexto durante el request (se envía con el próximo report/exception)
+Reporter.add_context(order: { id: 123, total: 500 })
+Reporter.add_tags(feature: "checkout")
+Reporter.add_fingerprint("checkout-error")
+```
+
+## Integraciones
+
+### HTTP (automático)
+
+El Railtie inserta `ExisRay::HttpMiddleware` después de `ActionDispatch::RequestId`. Hidrata el Tracer con el header entrante y sincroniza el `correlation_id` en cada request. No requiere configuración.
+
+### Sidekiq (automático)
+
+El Railtie registra client y server middleware. El trace context se propaga automáticamente entre enqueuer y worker. El `JsonFormatter` se aplica al logger de Sidekiq si `json_logs?` está activo. No requiere cambios en los workers.
+
+### BugBunny — Publisher (manual)
+
+Agregar `PublisherTracing` al middleware stack del cliente:
+
+```ruby
+# BugBunny::Client
+client = BugBunny::Client.new(pool: pool) do |stack|
+  stack.use ExisRay::BugBunny::PublisherTracing
+end
+
+# BugBunny::Resource (se hereda a subclases)
+class ApplicationResource < BugBunny::Resource
+  client_middleware do |stack|
+    stack.use ExisRay::BugBunny::PublisherTracing
+  end
 end
 ```
 
----
+### BugBunny — Consumer (automático)
 
-## 🛠 Usage Scenarios
+El Railtie registra `ConsumerTracingMiddleware` en el consumer middleware stack, más los hooks RPC (`rpc_reply_headers` y `on_rpc_reply`) para propagación completa en llamadas síncronas.
 
-### A. Structured JSON Logging
+### Faraday (manual)
 
-When `config.log_format = :json` is enabled, ExisRay transforms all your application outputs into single-line, context-rich JSON objects.
-
-**HTTP Requests:**
-```json
-{"time":"2026-03-12T14:30:00Z","level":"INFO","service":"App-HTTP","root_id":"Root=1-65a...bc","trace_id":"Root=1-65a...bc;Self=...","request_id":"9876-abcd-...","user_id":42,"isp_id":10,"method":"GET","path":"/api/v1/users","format":"html","controller":"UsersController","action":"index","status":200,"duration":45.2,"view":20.1,"db":15.0}
+```ruby
+conn = Faraday.new(url: "https://api.internal") do |f|
+  f.use ExisRay::FaradayMiddleware
+end
 ```
 
-**Sidekiq Jobs & Rake Tasks:**
-```json
-{"time":"2026-03-12T14:31:00Z","level":"INFO","service":"Sidekiq-HardWorker","root_id":"Root=1-65a...bc","user_id":42,"body":"[ExisRay] Processing payment..."}
-```
+### ActiveResource (automático)
 
-### B. Automatic Sidekiq Integration
+El Railtie prepend `ActiveResourceInstrumentation` a `ActiveResource::Base`. Inyecta el `propagation_trace_header` en cada request saliente.
 
-If `Sidekiq` is present, ExisRay automatically configures Client and Server middlewares. **No code changes are required in your workers.**
+### TaskMonitor (Rake/Cron)
 
-**How it works:**
-1.  **Enqueue:** When you call `Worker.perform_async`, the current `Trace ID` and `Current` attributes are injected into the job payload.
-2.  **Process:** When the worker executes, `Current` is hydrated with the original data.
-3.  **Logs:** Sidekiq logs will automatically include the propagated `Root ID` and Business Context (either as text tags or structured JSON).
-
-### C. Background Tasks (Cron/Rake)
-
-For Rake tasks or Cron jobs (where no HTTP request exists), use `ExisRay::TaskMonitor`. It generates a fresh `Root ID`.
-
-**File:** `lib/tasks/billing.rake`
+Genera un contexto de trazabilidad para tareas que no tienen request HTTP entrante:
 
 ```ruby
 task generate_invoices: :environment do
@@ -182,178 +242,121 @@ task generate_invoices: :environment do
 end
 ```
 
-### D. HTTP Clients
+`TaskMonitor` genera un `root_id` nuevo, configura Reporter y Current, loguea `task_started`/`task_finished` con `duration_s` y `status`, y limpia el contexto al finalizar. Si el bloque lanza una excepción, la registra como `status=failed` y la re-lanza.
 
-ExisRay ensures traceability across microservices.
+## JSON Logging
 
-#### ActiveResource (Automatic)
-If `ActiveResource` is detected, ExisRay automatically patches it. All outgoing requests will include:
-* `X-Wp-Trace-Id` (Trace Header)
-* `UserId`, `IspId`, `CorrelationId`
+Con `log_format: :json`, `ExisRay::JsonFormatter` reemplaza el formatter de Rails y emite cada línea como JSON single-line con contexto inyectado automáticamente:
 
-#### Faraday (Manual)
-For Faraday, you must explicitly add the middleware:
-
-```ruby
-conn = Faraday.new(url: "[https://api.internal](https://api.internal)") do |f|
-  f.use ExisRay::FaradayMiddleware
-  f.adapter Faraday.default_adapter
-end
-```
-
-### E. BugBunny (RabbitMQ)
-
-If your app publishes messages via [BugBunny](https://github.com/gedera/bug_bunny), ExisRay can propagate the active trace context through the `x-trace-id` AMQP header, and restore it on the consumer side so every log line during message processing shares the same `root_id` as the original HTTP request.
-
-#### Publisher — inject the trace header
-
-Add `ExisRay::BugBunny::PublisherTracing` to your publisher middleware stack.
-
-**Using `BugBunny::Client` directly:**
-
-```ruby
-client = BugBunny::Client.new(pool: connection_pool) do |stack|
-  stack.use ExisRay::BugBunny::PublisherTracing
-  stack.use BugBunny::Middleware::JsonResponse
-end
-```
-
-**Using `BugBunny::Resource`** (via `client_middleware`):
-
-```ruby
-class ApplicationResource < BugBunny::Resource
-  client_middleware do |stack|
-    stack.use ExisRay::BugBunny::PublisherTracing
-  end
-end
-```
-
-Defining it once in a base `ApplicationResource` is enough — all subclasses inherit the middleware stack automatically.
-
-If no trace context is active (e.g. a standalone script), the middleware does nothing.
-
-#### Consumer — restore the trace context
-
-Include `ExisRay::BugBunny::ConsumerTracing` in your base controller. It registers an `around_action` that reads `x-trace-id` from the message headers and hydrates `ExisRay::Tracer` before your action runs. The context is always reset in `ensure`, preventing leaks between messages.
-
-```ruby
-class ApplicationController < BugBunny::Controller
-  include ExisRay::BugBunny::ConsumerTracing
-end
-```
-
-**How it works end-to-end:**
-1. **Publish:** The publisher middleware injects `x-trace-id` into the AMQP headers of every outgoing message.
-2. **Consume:** The consumer concern reads that header, restores the trace context, and sets `source=system`.
-3. **Logs:** Every log line emitted during the controller action carries the original `root_id` and `correlation_id` from the upstream HTTP request.
-
-If a message arrives without `x-trace-id` (published without ExisRay), the concern is a no-op.
-
----
-
-## 📋 Advanced Logging Guide
-
-ExisRay's `JsonFormatter` is designed to be highly extensible. Here is how you can get the most out of your observability stack.
-
-### 1. Environment Best Practices
-
-For the best developer experience, we recommend using standard text logs in development and structured JSON logs in production.
-
-**File:** `config/environments/production.rb`
-```ruby
-Rails.application.configure do
-  # Force Rails to log to STDOUT so Docker/Swarm can collect the JSON output
-  if ENV["RAILS_LOG_TO_STDOUT"].present?
-    logger           = ActiveSupport::Logger.new(STDOUT)
-    logger.formatter = config.log_formatter
-    config.logger    = ActiveSupport::TaggedLogging.new(logger)
-  end
-
-  # Set an appropriate log level to avoid disk/network saturation
-  config.log_level = :info
-end
-```
-
-### 2. Extending JSON with Rails Tags (`config.log_tags`)
-
-If you are using native Rails tags, ExisRay will automatically capture them and group them into a `"tags"` array within your JSON log. This prevents the JSON structure from breaking.
-
-**File:** `config/environments/production.rb`
-```ruby
-# Add custom tags to your HTTP requests
-config.log_tags = [
-  :uuid,
-  ->(request) { request.headers["X-Custom-Header"] }
-]
-```
-**Output:**
 ```json
-{"time":"2026-03-12T14:30:00Z","service":"App-HTTP","tags":["abcd-1234-uuid","CustomValue"],"method":"GET","status":200}
+{"time":"2026-04-01T14:30:00Z","level":"INFO","service":"wispro_agent","root_id":"1-65f...abc","trace_id":"Root=1-65f...;Self=...","source":"http","user_id":42,"isp_id":10,"component":"exis_ray","event":"http_request","method":"GET","path":"/api/v1/users","status":200,"duration_s":0.0452}
 ```
 
-### 3. Extending JSON with Custom HTTP Fields
+Los mensajes con formato `key=value` se parsean y elevan al root del JSON. Los valores numéricos se castean automáticamente:
 
-To inject extra fields into each HTTP request log, create a subclass of `ExisRay::LogSubscriber` and override `self.extra_fields`:
-
-**File:** `app/models/my_log_subscriber.rb`
 ```ruby
+Rails.logger.info "component=billing event=invoice_created invoice_id=123 total=45.50"
+# => {"time":"...","level":"INFO","service":"...","root_id":"...","component":"billing","event":"invoice_created","invoice_id":123,"total":45.5}
+```
+
+Los mensajes tipo Hash (usados internamente por `LogSubscriber`) se mergean directamente. Los mensajes de texto libre se asignan a la clave `body`:
+
+```ruby
+Rails.logger.info "Algo pasó sin formato KV"
+# => {"time":"...","level":"INFO","service":"...","body":"Algo pasó sin formato KV"}
+```
+
+En modo `:text`, ExisRay inyecta el `trace_id` o `root_id` como tag de Rails (`config.log_tags`) y no modifica el formatter.
+
+### Campos auto-inyectados
+
+`JsonFormatter` inyecta estos campos automáticamente en cada línea. **Nunca** los incluyas manualmente en tus logs:
+
+| Campo | Condición |
+|:------|:----------|
+| `time` | Siempre (UTC ISO 8601) |
+| `level` | Siempre |
+| `service` | Siempre (nombre de la app Rails en snake_case) |
+| `root_id` | Cuando hay trace context activo |
+| `trace_id` | Cuando hay trace context activo |
+| `source` | Cuando hay trace context activo (`http`, `sidekiq`, `task`, `system`) |
+| `correlation_id` | Cuando `Current.correlation_id` está presente |
+| `user_id` | Cuando `Current.user_id` no es nil |
+| `isp_id` | Cuando `Current.isp_id` no es nil |
+| `sidekiq_job` | Solo en procesos Sidekiq |
+| `task` | Solo en procesos TaskMonitor |
+| `tags` | Solo si hay Rails tagged logging activo |
+
+### Filtrado de claves sensibles
+
+Las claves que matcheen `/password|pass|passwd|secret|token|api_key|auth/i` se reemplazan automáticamente por `[FILTERED]`, tanto en strings KV como en Hashes (incluyendo anidados).
+
+### LogSubscriber custom
+
+Para inyectar campos extra en los logs de requests HTTP, crear una subclase de `ExisRay::LogSubscriber`:
+
+```ruby
+# app/subscribers/my_log_subscriber.rb
 class MyLogSubscriber < ExisRay::LogSubscriber
   def self.extra_fields(event)
-    {
-      ip_address: event.payload[:ip],
-      user_agent: event.payload[:headers]["HTTP_USER_AGENT"]
-    }
+    { user_agent: event.payload[:headers]["HTTP_USER_AGENT"] }
   end
 end
-```
 
-Then register it in your initializer:
-
-**File:** `config/initializers/exis_ray.rb`
-```ruby
+# config/initializers/exis_ray.rb
 ExisRay.configure do |config|
   config.log_subscriber_class = "MyLogSubscriber"
 end
 ```
 
-**Output:**
-```json
-{"time":"2026-03-12T14:30:00Z","service":"App-HTTP","root_id":"Root=1-65a...","method":"GET","ip_address":"192.168.1.1","user_agent":"Chrome","status":200}
+## Referencia del Tracer
+
+`ExisRay::Tracer` es el componente central. Extiende `ActiveSupport::CurrentAttributes` para thread-safety y se resetea automáticamente al final de cada request/job.
+
+### Atributos
+
+| Atributo | Tipo | Descripción |
+|:---------|:-----|:------------|
+| `trace_id` | `String` | Header completo parseado (`Root=...;Self=...;CalledFrom=...`) |
+| `root_id` | `String` | ID raíz, constante a lo largo de toda la cadena de servicios |
+| `self_id` | `String` | ID del span del servicio que generó el header |
+| `called_from` | `String` | Nombre del servicio que envió el request |
+| `total_time_so_far` | `Integer` | Tiempo acumulado en ms desde el inicio de la cadena |
+| `source` | `String` | Entrypoint: `http`, `sidekiq`, `task`, `system` |
+| `request_id` | `String` | UUID del request (Rails `ActionDispatch::RequestId`) |
+| `created_at` | `Float` | Timestamp monotónico del inicio del contexto |
+| `sidekiq_job` | `String` | Nombre del job Sidekiq (solo en workers) |
+| `task` | `String` | Nombre de la tarea (solo en TaskMonitor) |
+
+### Métodos públicos
+
+```ruby
+# Hidratar el Tracer (usado internamente por los middlewares)
+ExisRay::Tracer.hydrate(trace_id: header_string, source: "http")
+
+# Generar header de propagación para el siguiente servicio
+ExisRay::Tracer.generate_trace_header
+# => "Root=1-abc123-...;Self=1-def456-...;CalledFrom=wispro_agent;TotalTimeSoFar=42ms"
+
+# Duración del request actual
+ExisRay::Tracer.current_duration_s   # => 0.0452 (Float, segundos)
+ExisRay::Tracer.current_duration_ms  # => 45 (Integer, milisegundos)
+
+# Formatear duración human-readable
+ExisRay::Tracer.format_duration(0.007)   # => "7.0ms"
+ExisRay::Tracer.format_duration(1.25)    # => "1.25s"
+ExisRay::Tracer.format_duration(125.0)   # => "2 minutes 5 seconds"
+
+# Nombre del servicio (snake_case del module parent de la app Rails)
+ExisRay::Tracer.service_name  # => "wispro_agent"
+
+# Correlation ID compuesto
+ExisRay::Tracer.correlation_id  # => "wispro_agent;1-65f...abc"
+
+# Sincronizar correlation_id al Current configurado
+ExisRay.sync_correlation_id
 ```
 
-If you don't need extra fields, skip this step — `ExisRay::LogSubscriber` is used by default with no additional fields.
+## Licencia
 
----
-
-## 🏗 Architecture
-
-* **`ExisRay::Tracer`**: The infrastructure layer. Handles AWS X-Ray format parsing and ID generation.
-* **`ExisRay::Current`**: The business layer. Manages domain identity (`User`, `ISP`).
-* **`ExisRay::Reporter`**: The observability layer. Bridges the gap between your app and Sentry.
-* **`ExisRay::JsonFormatter`**: The central logging engine. Intercepts HTTP, Sidekiq, and Tasks to output clean JSON.
-    * **KV String Parser:** It automatically detects if a log message (String) uses `key=value` format. If so, it parses the pairs and elevates them to the root of the JSON. For example, `Rails.logger.info "event=boot status=ok"` becomes `{"event":"boot","status":"ok",...}`. It supports quoted values with spaces: `message="something went wrong"`.
-* **`ExisRay::LogSubscriber`**: Replaces Lograge for HTTP request logging. Subscribes to `process_action.action_controller` and suppresses Rails' default multi-line log subscribers. Compatible with Rails 6, 7, and 8. Subclass it and override `self.extra_fields(event)` to inject custom fields.
-* **`ExisRay::TaskMonitor`**: The entry point for non-HTTP processes.
-
-## Known Behaviors
-
-### Third-party gem warnings in `body`
-
-ExisRay captures all log output — including warnings emitted by third-party gems — and routes free-text lines to the `body` field. Some gems may include user-identifying data in their warnings.
-
-**Example:** The [Bullet](https://github.com/flyerhzm/bullet) N+1 query detector emits warnings like:
-
-```
-user: gabriel
-GET /clients?page=1
-USE eager loading detected
-  Client => [:gps_point]
-```
-
-This text lands verbatim in `body`. ExisRay does not filter or redact `body` content, as it cannot know what third-party gems will include.
-
-**Recommendation:** If you use Bullet or similar gems in production, configure them to use a separate notification channel (e.g., Slack, Honeybadger) instead of `Rails.logger`, to avoid leaking usernames or other PII into your structured logs.
-
-## License
-
-The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
+Disponible como open source bajo los términos de la [MIT License](https://opensource.org/licenses/MIT).

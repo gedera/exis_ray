@@ -65,7 +65,7 @@ module ExisRay
       return nil if user_id.nil?
       return nil unless defined?(::User) && ::User.respond_to?(:find_by)
 
-      @user_object ||= ::User.find_by(id: user_id)
+      @user_object ||= ::User.find_by(id: user_id) # rubocop:disable Naming/MemoizedInstanceVariableName
     end
 
     def isp=(object)
@@ -76,7 +76,7 @@ module ExisRay
       return nil if isp_id.nil?
       return nil unless defined?(::Isp) && ::Isp.respond_to?(:find_by)
 
-      @isp_object ||= ::Isp.find_by(id: isp_id)
+      @isp_object ||= ::Isp.find_by(id: isp_id) # rubocop:disable Naming/MemoizedInstanceVariableName
     end
 
     def user?

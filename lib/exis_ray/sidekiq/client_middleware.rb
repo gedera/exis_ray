@@ -2,6 +2,7 @@
 
 module ExisRay
   module Sidekiq
+    # Middleware de cliente que inyecta trace context y contexto de negocio en el payload del job.
     class ClientMiddleware
       # Intercepta el push del trabajo a Redis.
       #

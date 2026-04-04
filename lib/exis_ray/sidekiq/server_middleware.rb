@@ -38,7 +38,7 @@ module ExisRay
 
       def cleanup_current
         current = ExisRay.current_class
-        return unless current&.respond_to?(:reset)
+        return unless current.respond_to?(:reset)
 
         current.reset
       rescue StandardError
@@ -46,7 +46,7 @@ module ExisRay
 
       def cleanup_reporter
         reporter = ExisRay.reporter_class
-        return unless reporter&.respond_to?(:reset)
+        return unless reporter.respond_to?(:reset)
 
         reporter.reset
       rescue StandardError

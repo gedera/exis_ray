@@ -2,7 +2,6 @@
 
 require "logger"
 require "json"
-require "set"
 require "active_support/tagged_logging"
 
 module ExisRay
@@ -208,7 +207,7 @@ module ExisRay
       return {} if hash.nil?
       return {} if visited.include?(hash.object_id)
 
-      visited = visited | Set.new([hash.object_id])
+      visited |= Set.new([hash.object_id])
 
       hash.each_with_object({}) do |(k, v), result|
         result[k] = case v
@@ -231,7 +230,7 @@ module ExisRay
       return [] if array.nil?
       return [] if visited.include?(array.object_id)
 
-      visited = visited | Set.new([array.object_id])
+      visited |= Set.new([array.object_id])
 
       array.map do |element|
         case element

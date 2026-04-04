@@ -1,0 +1,24 @@
+mcps:
+  - github
+  - clickup
+skills:
+  - name: skill-manager
+    repo: sequre/ai_knowledge
+  - name: yard
+    repo: sequre/ai_knowledge
+  - name: quality-code
+    repo: sequre/ai_knowledge
+  - name: gem-release
+    repo: sequre/ai_knowledge
+  - name: skill-builder
+    repo: sequre/ai_knowledge
+  - name: ai-reports
+    repo: sequre/ai_knowledge
+  - name: agent-review
+    repo: sequre/ai_knowledge
+  - name: documentation-writer
+    repo: github/awesome-copilot
+    path: skills/documentation-writer
+  - name: find-skills
+    repo: vercel-labs/skills
+    path: skills/find-skills

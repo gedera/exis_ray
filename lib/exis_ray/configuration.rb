@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ExisRay
   # Clase de configuración global para la gema.
   # Permite personalizar los headers de trazabilidad y definir las clases de la aplicación host
@@ -40,10 +42,10 @@ module ExisRay
 
     # Inicializa la configuración con valores por defecto compatibles con AWS X-Ray.
     def initialize
-      @trace_header = 'HTTP_X_AMZN_TRACE_ID'
-      @propagation_trace_header = 'X-Amzn-Trace-Id'
-      @reporter_class = 'Reporter'
-      @current_class = 'Current'
+      @trace_header = "HTTP_X_AMZN_TRACE_ID"
+      @propagation_trace_header = "X-Amzn-Trace-Id"
+      @reporter_class = "Reporter"
+      @current_class = "Current"
       @log_format = :text
       @log_subscriber_class = nil
     end

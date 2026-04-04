@@ -1,10 +1,41 @@
 # ExisRay — Project Intelligence
 
-## Qué es esta gema
+## ¿Qué es ExisRay?
 
 ExisRay es la capa de observabilidad y trazabilidad distribuida del ecosistema Wispro. Se integra con Rails para emitir logs estructurados en JSON, propagar trace context entre servicios (HTTP, Sidekiq, RabbitMQ), y mantener identidad de negocio (user_id, isp_id, correlation_id) en cada línea de log.
 
 El estándar de logging que implementa está definido en `MANIFEST.md`. Ese documento es la fuente de verdad — cualquier duda sobre formato, campos, o semántica de niveles se resuelve ahí.
+
+---
+## Knowledge Base
+- Las skills en `.agents/skills/` incluyen conocimiento de dependencias.
+- Leer la skill de una dependencia ANTES de responder sobre ella.
+- Rebuild: `ruby .agents/skills/skill-manager/scripts/sync.rb`
+
+### Entorno
+- Versión de Ruby: leer `.ruby-version`
+- Versión de Rails y gemas: leer `Gemfile.lock`
+- Gestor de Ruby: chruby (no usar rvm ni rbenv)
+- Package manager: Bundler
+
+### RuboCop
+- Usamos rubocop-rails-omakase como base.
+- Correr `bundle exec rubocop -a` antes de commitear.
+- No deshabilitar cops sin justificación en el PR.
+
+### YARD
+- Documentación incremental: si tocás un método, documentalo con YARD.
+- Consultar la skill `yard` para tags y tipos correctos.
+- Verificar cobertura: `bundle exec yard stats --list-undoc`
+
+### Testing
+- Framework: RSpec
+- Correr: `bundle exec rspec`
+- Todo código nuevo debe tener tests.
+
+### Releases o Nuevas versiones
+- Gemas: `/gem-release`
+- Servicios: `/service-release build` o `/service-release deploy`
 
 ---
 
@@ -146,13 +177,3 @@ end
 ```
 
 ---
-
-## Testing en Consola
-
-```ruby
-# Inicializar trace context para probar desde rails console
-ExisRay::Tracer.hydrate(
-  trace_id: "Root=1-#{Time.now.to_i.to_s(16)}-#{SecureRandom.hex(12)}",
-  source: 'system'
-)
-```

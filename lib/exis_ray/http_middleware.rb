@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 module ExisRay
+  # Rack middleware que hidrata el Tracer con el header de trazabilidad entrante.
+  # Se inserta automáticamente después de `ActionDispatch::RequestId` via Railtie.
   class HttpMiddleware
     def initialize(app)
       @app = app

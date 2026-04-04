@@ -1,3 +1,18 @@
+## [0.5.11] - 2026-04-04
+
+### Documentación
+- **README reescrito con Diátaxis:** Quick Start paso a paso, sección "Cómo funciona" con diagrama de flujo de propagación, referencia completa del Tracer (atributos y métodos públicos), documentación de Current (helpers, predicados, auto-sync), API pública del Reporter (`report`, `exception`, `add_context`, `add_tags`, hooks), tabla de campos auto-inyectados con condiciones, ejemplo de LogSubscriber custom, filtrado de claves sensibles, y modo `:text` explicado.
+- **YARD:** Agregada documentación en `HttpMiddleware` y `Sidekiq::ClientMiddleware`.
+- **CLAUDE.md:** Agregada sección Knowledge Base con instrucciones de entorno, RuboCop, YARD, testing y releases.
+
+### Mejoras internas
+- **Skills migration:** Migración de skills de `.claude/skills/` a `.agents/skills/` con nuevo skill manager (`skills.yml` + `skills.lock`).
+- **TaskMonitor:** Renombrado `get_pod_identifier` → `pod_identifier` (Naming/AccessorMethodName). Líneas largas partidas con `\` para cumplir Layout/LineLength.
+- **Current:** Agregado `rubocop:disable Naming/MemoizedInstanceVariableName` inline en `@user_object`/`@isp_object` — el nombre es intencional porque `resets` y los setters lo referencian para invalidar cache.
+- **JsonFormatter:** Removido `require "set"` innecesario y simplificado operador de unión de sets.
+- **Configuration:** Normalización de comillas a double-quotes (rubocop-omakase).
+- **Gemfile:** Reordenamiento alfabético de dependencias de desarrollo.
+
 ## [0.5.10] - 2026-04-01
 
 ### Fixed

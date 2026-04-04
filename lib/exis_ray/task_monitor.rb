@@ -38,21 +38,24 @@ module ExisRay
       human_time = ExisRay::Tracer.format_duration(duration_s)
 
       log_event(:info,
-                "component=exis_ray event=task_finished task=#{task_name} status=success duration_s=#{duration_s} duration_human=\"#{human_time}\"")
+                "component=exis_ray event=task_finished task=#{task_name} " \
+                "status=success duration_s=#{duration_s} duration_human=\"#{human_time}\"")
     rescue StandardError => e
       duration_s = ExisRay::Tracer.current_duration_s
       human_time = ExisRay::Tracer.format_duration(duration_s)
 
       log_event(:error,
-                "component=exis_ray event=task_finished task=#{task_name} status=failed duration_s=#{duration_s} duration_human=\"#{human_time}\" error_class=#{e.class} error_message=#{e.message.inspect}")
+                "component=exis_ray event=task_finished task=#{task_name} " \
+                "status=failed duration_s=#{duration_s} duration_human=\"#{human_time}\" " \
+                "error_class=#{e.class} error_message=#{e.message.inspect}")
       raise e
     ensure
       # Limpieza centralizada obligatoria para evitar filtraciones de memoria o contexto
       ExisRay::Tracer.reset
       current  = ExisRay.current_class
       reporter = ExisRay.reporter_class
-      current.reset  if current&.respond_to?(:reset)
-      reporter.reset if reporter&.respond_to?(:reset)
+      current.reset  if current.respond_to?(:reset)
+      reporter.reset if reporter.respond_to?(:reset)
     end
 
     # --- Métodos Privados ---
@@ -67,14 +70,14 @@ module ExisRay
       ExisRay::Tracer.request_id   = SecureRandom.uuid
       ExisRay::Tracer.created_at   = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
-      pod_id = get_pod_identifier
+      pod_id = pod_identifier
       ExisRay::Tracer.root_id = ExisRay::Tracer.send(:generate_new_root, pod_id)
     end
 
     # Obtiene un identificador único del contenedor o máquina actual.
     #
     # @return [String] El sufijo del hostname o "local" por defecto.
-    def self.get_pod_identifier
+    def self.pod_identifier
       (ENV["HOSTNAME"] || "local").split("-").last.to_s
     end
 
@@ -104,6 +107,6 @@ module ExisRay
     rescue StandardError
     end
 
-    private_class_method :get_pod_identifier, :setup_tracer, :execute_with_optional_tags, :log_event
+    private_class_method :pod_identifier, :setup_tracer, :execute_with_optional_tags, :log_event
   end
 end

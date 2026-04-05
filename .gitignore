@@ -6,3 +6,7 @@
 /pkg/
 /spec/reports/
 /tmp/
+/.agents/
+
+# Variables de entorno
+.env

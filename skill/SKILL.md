@@ -7,6 +7,8 @@ description: Skill de conocimiento completo sobre ExisRay, la capa de observabil
 
 Observabilidad y trazabilidad distribuida para microservicios Rails (AWS X-Ray compatible).
 
+Para el complemento del estándar de logging Wispro (regla Data First, mapeo OpenTelemetry, ciclo de vida de jobs/requests), ver `references/standard.md`.
+
 ---
 
 ## Glosario

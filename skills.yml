@@ -2,23 +2,43 @@ mcps:
   - github
   - clickup
 skills:
-  - name: skill-manager
+  skill-manager:
     repo: sequre/ai_knowledge
-  - name: yard
+    scope: local
+  yard:
     repo: sequre/ai_knowledge
-  - name: quality-code
+    scope: local
+  quality-code:
     repo: sequre/ai_knowledge
-  - name: gem-release
+    scope: local
+  gem-release:
     repo: sequre/ai_knowledge
-  - name: skill-builder
+    scope: local
+  skill-builder:
     repo: sequre/ai_knowledge
-  - name: ai-reports
+    scope: local
+  ai-reports:
     repo: sequre/ai_knowledge
-  - name: agent-review
+    scope: local
+    environment:
+      space_id: "${AI_REPORTS_SPACE_ID}"
+      bug_reports_list_id: "${AI_REPORTS_BUG_REPORTS_LIST_ID}"
+      improvements_list_id: "${AI_REPORTS_IMPROVEMENTS_LIST_ID}"
+  agent-review:
     repo: sequre/ai_knowledge
-  - name: documentation-writer
+    scope: local
+    environment:
+      space_id: "${AGENT_REVIEW_SAPCE_ID}"
+      list_id: "${AGENT_LIST_ID}"
+  documentation-writer:
     repo: github/awesome-copilot
     path: skills/documentation-writer
-  - name: find-skills
+    scope: local
+  find-skills:
     repo: vercel-labs/skills
     path: skills/find-skills
+    scope: local
+  opentelemetry:
+    repo: bobmatnyc/claude-mpm-skills
+    path: universal/observability/opentelemetry
+    scope: local

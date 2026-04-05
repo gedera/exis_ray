@@ -1,5 +1,5 @@
 ---
-synced_at: '2026-04-04 19:02:47'
+synced_at: '2026-04-05 14:18:54'
 skills:
 - name: agent-review
   scope: local
@@ -10,9 +10,15 @@ skills:
 - name: documentation-writer
   scope: local
   path: "/Users/gabriel/src/gems/exis_ray/.agents/skills/documentation-writer"
+- name: find-skills
+  scope: local
+  path: "/Users/gabriel/src/gems/exis_ray/.agents/skills/find-skills"
 - name: gem-release
   scope: local
   path: "/Users/gabriel/src/gems/exis_ray/.agents/skills/gem-release"
+- name: opentelemetry
+  scope: local
+  path: "/Users/gabriel/src/gems/exis_ray/.agents/skills/opentelemetry"
 - name: quality-code
   scope: local
   path: "/Users/gabriel/src/gems/exis_ray/.agents/skills/quality-code"

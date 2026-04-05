@@ -4,9 +4,14 @@
 
 ExisRay es la capa de observabilidad y trazabilidad distribuida del ecosistema Wispro. Se integra con Rails para emitir logs estructurados en JSON, propagar trace context entre servicios (HTTP, Sidekiq, RabbitMQ), y mantener identidad de negocio (user_id, isp_id, correlation_id) en cada línea de log.
 
-El estándar de logging que implementa está definido en `MANIFEST.md`. Ese documento es la fuente de verdad — cualquier duda sobre formato, campos, o semántica de niveles se resuelve ahí.
+El estándar de logging que implementa está definido en `skill/SKILL.md` (API, arquitectura, reglas generales) y `skill/references/standard.md` (Data First, mapeo OpenTelemetry, ciclo de vida). Son la fuente de verdad — cualquier duda sobre formato, campos, o semántica de niveles se resuelve ahí.
 
----
+## Documentación
+
+- **Para humanos**: `docs/` (5 archivos) + `README.md`. Ver README para índice.
+- **Para agentes AI**: `skill/SKILL.md` + `skill/references/`. Es la skill empaquetada que otros proyectos consumen via `skill-manager sync`.
+- **Nunca referenciar `skill/` desde `docs/` o `README.md`** — son audiencias distintas.
+
 ## Knowledge Base
 - Las skills en `.agents/skills/` incluyen conocimiento de dependencias.
 - Leer la skill de una dependencia ANTES de responder sobre ella.
@@ -34,8 +39,8 @@ El estándar de logging que implementa está definido en `MANIFEST.md`. Ese docu
 - Todo código nuevo debe tener tests.
 
 ### Releases o Nuevas versiones
-- Gemas: `/gem-release`
-- Servicios: `/service-release build` o `/service-release deploy`
+- Usar `/gem-release` para publicar nuevas versiones.
+- El GitHub Action publica a RubyGems automáticamente al pushear un tag `v*`.
 
 ---
 

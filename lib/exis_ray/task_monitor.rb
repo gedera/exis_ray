@@ -29,7 +29,7 @@ module ExisRay
         curr.correlation_id = ExisRay::Tracer.correlation_id
       end
 
-      log_event(:info, "component=exis_ray event=task_started task=#{task_name} status=started")
+      log_event(:info, "component=exis_ray event=task_started task=#{task_name} outcome=started")
 
       # Bloque de ejecución con o sin tags dependiendo de la configuración
       execute_with_optional_tags(&block)
@@ -39,15 +39,17 @@ module ExisRay
 
       log_event(:info,
                 "component=exis_ray event=task_finished task=#{task_name} " \
-                "status=success duration_s=#{duration_s} duration_human=\"#{human_time}\"")
+                "outcome=success duration_s=#{duration_s} duration_human=\"#{human_time}\"")
     rescue StandardError => e
       duration_s = ExisRay::Tracer.current_duration_s
       human_time = ExisRay::Tracer.format_duration(duration_s)
 
       log_event(:error,
                 "component=exis_ray event=task_finished task=#{task_name} " \
-                "status=failed duration_s=#{duration_s} duration_human=\"#{human_time}\" " \
-                "error_class=#{e.class} error_message=#{e.message.inspect}")
+                "outcome=failed duration_s=#{duration_s} duration_human=\"#{human_time}\" " \
+                "error_class=#{e.class} error_message=#{e.message.inspect} " \
+                "exception.type=#{e.class} exception.message=#{e.message.inspect} " \
+                "exception.stacktrace=#{format_stacktrace(e.backtrace)}")
       raise e
     ensure
       # Limpieza centralizada obligatoria para evitar filtraciones de memoria o contexto
@@ -107,6 +109,22 @@ module ExisRay
     rescue StandardError
     end
 
-    private_class_method :pod_identifier, :setup_tracer, :execute_with_optional_tags, :log_event
+    # Formatea el backtrace para logging:
+    # - Limita a las primeras 20 líneas (evita líneas de MB)
+    # - Maneja nil backtrace (excepciones sin stacktrace)
+    #
+    # @param backtrace [Array<String>, nil]
+    # @return [String]
+    def self.format_stacktrace(backtrace)
+      return '""' unless backtrace
+
+      lines = backtrace.take(20).join("\n")
+      lines.inspect
+    rescue StandardError
+      '""'
+    end
+
+    private_class_method :pod_identifier, :setup_tracer, :execute_with_optional_tags,
+                         :log_event, :format_stacktrace
   end
 end

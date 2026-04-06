@@ -1,6 +1,9 @@
 ---
-synced_at: '2026-04-05 14:18:54'
+synced_at: '2026-04-05 18:20:39'
 skills:
+- name: action-plan
+  scope: local
+  path: "/Users/gabriel/src/gems/exis_ray/.agents/skills/action-plan"
 - name: agent-review
   scope: local
   path: "/Users/gabriel/src/gems/exis_ray/.agents/skills/agent-review"

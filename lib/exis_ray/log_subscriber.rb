@@ -32,7 +32,7 @@ module ExisRay
     # @return [void]
     def process_action(event)
       payload = build_payload(event)
-      if payload[:status] && payload[:status] >= 500
+      if payload[:http_status] && payload[:http_status] >= 500
         logger.error(payload)
       else
         logger.info(payload)
@@ -90,23 +90,181 @@ module ExisRay
       view_s     = payload[:view_runtime] ? (payload[:view_runtime] / 1000.0).round(4) : nil
       db_s       = payload[:db_runtime] ? (payload[:db_runtime] / 1000.0).round(4) : nil
 
+      headers = payload[:headers] || {}
+
+      exception_data = extract_exception_data(payload)
+
       data = {
         component: "exis_ray",
         event: "http_request",
         method: payload[:method],
         path: payload[:path],
+        http_route: extract_http_route(payload),
         format: payload[:format],
         controller: payload[:controller],
         action: payload[:action],
-        status: status,
+        http_status: status,
         duration_s: duration_s,
         duration_human: ExisRay::Tracer.format_duration(duration_s),
         view_runtime_s: view_s,
-        db_runtime_s: db_s
+        db_runtime_s: db_s,
+        user_agent_original: headers["HTTP_USER_AGENT"],
+        server_address: extract_server_address(headers["HTTP_HOST"])
       }
 
+      data.merge!(exception_data)
       data.merge!(self.class.extra_fields(event))
       data.compact
+    end
+
+    # Extrae el hostname del valor de HTTP_HOST, descartando el puerto si está presente.
+    # OTel `server.address` espera solo hostname; el puerto va en `server.port` por separado.
+    #
+    # @param http_host [String, nil] Valor del header HTTP_HOST (ej: "api.example.com:3000").
+    # @return [String, nil] Hostname sin puerto, o nil si http_host es nil.
+    def extract_server_address(http_host)
+      return nil unless http_host
+
+      http_host.split(":").first
+    end
+
+    # Extrae los datos de excepción para logs OTel.
+    # Emite tanto los campos legacy (`error_class`/`error_message`) como los OTel
+    # (`exception.type`/`exception.message`/`exception.stacktrace`) durante la ventana
+    # de transición definida en el plan "Breaking changes OTel v1.0".
+    #
+    # El stacktrace se toma de `payload[:exception_object]` (expuesto por Rails), no
+    # de `payload[:exception]` que es solo `[class_name, message]`.
+    #
+    # @param payload [Hash] Payload completo del notification de Rails.
+    # @return [Hash] Campos exception.* y error_class/error_message con keys symbol.
+    def extract_exception_data(payload)
+      exception_info = payload[:exception]
+      return {} unless exception_info
+
+      exception_class = exception_info.first
+      exception_message = exception_info.last
+
+      data = {
+        error_class: exception_class,
+        error_message: exception_message,
+        "exception.type": exception_class,
+        "exception.message": exception_message
+      }
+
+      exception_object = payload[:exception_object]
+      if exception_object.respond_to?(:backtrace) && exception_object.backtrace
+        data[:"exception.stacktrace"] = exception_object.backtrace.take(20).join("\n")
+      end
+
+      data
+    rescue StandardError
+      {}
+    end
+
+    # Extrae la plantilla de ruta (http.route) de una URL concreta.
+    # OTel espera la ruta templated (ej: `/users/:id`) en lugar de la URL concreta
+    # (ej: `/users/42`), para bajar cardinalidad en dashboards.
+    #
+    # Estrategia en capas:
+    # 1. Rails 7.1+: `payload[:request].route_uri_pattern` si está presente.
+    # 2. Fallback: iterar `Rails.application.routes.routes` buscando el match por
+    #    `defaults[:controller]` + `defaults[:action]` + verb HTTP, y devolver el
+    #    pattern limpio de la primera ruta que matchee.
+    #
+    # @param payload [Hash] Payload del evento de Rails.
+    # @return [String, nil] Ruta plantilla o nil si no se puede resolver.
+    def extract_http_route(payload)
+      return nil unless defined?(Rails) && Rails.application&.routes
+
+      from_request = extract_from_route_uri_pattern(payload)
+      return from_request if from_request
+
+      controller = payload[:controller]
+      action = payload[:action]
+      method = payload[:method]
+      return nil unless controller && action && method
+
+      find_route_template(controller, action, method)
+    rescue StandardError
+      nil
+    end
+
+    # Rails 7.1+ expone `route_uri_pattern` en el request. Algunas versiones de
+    # `ActionController::Instrumentation` incluyen el request en el payload; si no,
+    # esta rama simplemente retorna nil y el caller cae al fallback.
+    #
+    # @param payload [Hash]
+    # @return [String, nil]
+    def extract_from_route_uri_pattern(payload)
+      request = payload[:request]
+      return nil unless request.respond_to?(:route_uri_pattern)
+
+      pattern = request.route_uri_pattern
+      clean_route_pattern(pattern.to_s) if pattern
+    rescue StandardError
+      nil
+    end
+
+    # Busca en la RouteSet de Rails la ruta que matchea controller + action + verb
+    # y devuelve su pattern template (ej: `/users/:id`).
+    #
+    # Rails guarda controller/action en `route.defaults`, no en `route.requirements`.
+    # El formato típico es `defaults[:controller] == "users"` (snake_case sin el sufijo
+    # `Controller`), mientras que `payload[:controller]` viene como `"UsersController"`.
+    #
+    # @param controller [String] Class name del controller (ej: "UsersController").
+    # @param action [String] Nombre del action (ej: "show").
+    # @param method [String] Método HTTP (ej: "GET").
+    # @return [String, nil] Pattern template o nil.
+    def find_route_template(controller, action, method)
+      normalized = controller.to_s.sub(/Controller$/, "").gsub("::", "/")
+      normalized = normalized.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
+                             .gsub(/([a-z\d])([A-Z])/, '\1_\2')
+                             .downcase
+      action_s = action.to_s
+      method_s = method.to_s.upcase
+
+      Rails.application.routes.routes.each do |route|
+        defaults = route.defaults
+        next unless defaults[:controller] == normalized
+        next unless defaults[:action].to_s == action_s
+        next unless route_matches_verb?(route, method_s)
+
+        return clean_route_pattern(route.path.spec.to_s)
+      end
+      nil
+    rescue StandardError
+      nil
+    end
+
+    # Verifica que el verb HTTP de la ruta matchee con el método del request.
+    # `route.verb` en Rails 5+ es un String (ej: "GET"); en versiones antes era un
+    # Regexp. Manejamos ambos y además el caso de rutas multi-verb (empty verb).
+    #
+    # @param route [ActionDispatch::Journey::Route]
+    # @param method [String] Método HTTP en mayúsculas.
+    # @return [Boolean]
+    def route_matches_verb?(route, method)
+      verb = route.verb
+      return true if verb.nil? || verb.to_s.empty?
+
+      if verb.is_a?(Regexp)
+        verb.match?(method)
+      else
+        verb.to_s.upcase == method
+      end
+    rescue StandardError
+      true
+    end
+
+    # Limpia el sufijo `(.:format)` típico de las rutas de Rails, que no es parte
+    # del template semántico que queremos emitir en el log.
+    #
+    # @param pattern [String] Pattern crudo de `route.path.spec.to_s`.
+    # @return [String]
+    def clean_route_pattern(pattern)
+      pattern.to_s.sub(/\(\.:format\)\z/, "")
     end
 
     # Infiere el status HTTP desde el nombre de la excepción cuando el request

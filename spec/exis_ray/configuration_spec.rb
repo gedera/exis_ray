@@ -29,6 +29,75 @@ RSpec.describe ExisRay::Configuration do
     it "log_subscriber_class por defecto es nil" do
       expect(config.log_subscriber_class).to be_nil
     end
+
+    it "service_version por defecto es nil fuera de Rails" do
+      expect(config.service_version).to be_nil
+    end
+
+    it "deployment_environment por defecto es nil fuera de Rails" do
+      expect(config.deployment_environment).to be_nil
+    end
+  end
+
+  describe "resource attributes OTel" do
+    it "permite setear service_version" do
+      config = described_class.new
+      config.service_version = "2.0.0"
+
+      expect(config.service_version).to eq("2.0.0")
+    end
+
+    it "permite setear deployment_environment" do
+      config = described_class.new
+      config.deployment_environment = "staging"
+
+      expect(config.deployment_environment).to eq("staging")
+    end
+
+    describe "#default_service_version" do
+      it "retorna nil cuando Rails no está definido" do
+        expect(described_class.new.default_service_version).to be_nil
+      end
+
+      it "lee config.version (atributo directo) con prioridad sobre config.x.version" do
+        rails_config = Struct.new(:version).new("1.2.3")
+        allow(rails_config).to receive(:respond_to?).and_call_original
+        app = Struct.new(:config).new(rails_config)
+        stub_const("Rails", Class.new do
+          define_singleton_method(:application) { app }
+        end)
+
+        expect(described_class.new.default_service_version).to eq("1.2.3")
+      end
+
+      it "cae a config.x.version si config.version no está definido" do
+        x_config = Struct.new(:version).new("3.0.0")
+        rails_config = Struct.new(:x).new(x_config)
+        app = Struct.new(:config).new(rails_config)
+        stub_const("Rails", Class.new do
+          define_singleton_method(:application) { app }
+        end)
+
+        expect(described_class.new.default_service_version).to eq("3.0.0")
+      end
+
+      it "retorna nil si config.x.version es un OrderedOptions vacío (no un string)" do
+        x_config = ActiveSupport::OrderedOptions.new
+        rails_config = Struct.new(:x).new(x_config)
+        app = Struct.new(:config).new(rails_config)
+        stub_const("Rails", Class.new do
+          define_singleton_method(:application) { app }
+        end)
+
+        expect(described_class.new.default_service_version).to be_nil
+      end
+    end
+
+    describe "#default_deployment_environment" do
+      it "retorna nil cuando Rails no está definido" do
+        expect(described_class.new.default_deployment_environment).to be_nil
+      end
+    end
   end
 
   describe "#json_logs?" do

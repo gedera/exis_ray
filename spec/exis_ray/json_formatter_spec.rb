@@ -141,6 +141,78 @@ RSpec.describe ExisRay::JsonFormatter do
       end
     end
 
+    describe "severity_number (OTel Log Data Model)" do
+      it "inyecta severity_number=9 para INFO" do
+        result = JSON.parse(formatter.call("INFO", timestamp, progname, "event=x"))
+
+        expect(result["severity_number"]).to eq(9)
+      end
+
+      it "inyecta severity_number=13 para WARN" do
+        result = JSON.parse(formatter.call("WARN", timestamp, progname, "event=x"))
+
+        expect(result["severity_number"]).to eq(13)
+      end
+
+      it "inyecta severity_number=17 para ERROR" do
+        result = JSON.parse(formatter.call("ERROR", timestamp, progname, "event=x"))
+
+        expect(result["severity_number"]).to eq(17)
+      end
+
+      it "inyecta severity_number=5 para DEBUG" do
+        result = JSON.parse(formatter.call("DEBUG", timestamp, progname, "event=x"))
+
+        expect(result["severity_number"]).to eq(5)
+      end
+
+      it "inyecta severity_number=21 para FATAL" do
+        result = JSON.parse(formatter.call("FATAL", timestamp, progname, "event=x"))
+
+        expect(result["severity_number"]).to eq(21)
+      end
+
+      it "omite severity_number para niveles no estándar" do
+        result = JSON.parse(formatter.call("CUSTOM", timestamp, progname, "event=x"))
+
+        expect(result).not_to have_key("severity_number")
+      end
+    end
+
+    describe "resource attributes OTel (service_version, deployment_environment)" do
+      it "inyecta service_version cuando Configuration lo provee" do
+        allow(ExisRay.configuration).to receive_messages(service_version: "1.2.3", deployment_environment: nil)
+
+        result = call("event=boot")
+
+        expect(result["service_version"]).to eq("1.2.3")
+      end
+
+      it "inyecta deployment_environment cuando Configuration lo provee" do
+        allow(ExisRay.configuration).to receive_messages(service_version: nil, deployment_environment: "production")
+
+        result = call("event=boot")
+
+        expect(result["deployment_environment"]).to eq("production")
+      end
+
+      it "omite service_version cuando es nil" do
+        allow(ExisRay.configuration).to receive_messages(service_version: nil, deployment_environment: "test")
+
+        result = call("event=boot")
+
+        expect(result).not_to have_key("service_version")
+      end
+
+      it "omite deployment_environment cuando es nil" do
+        allow(ExisRay.configuration).to receive_messages(service_version: "1.0", deployment_environment: nil)
+
+        result = call("event=boot")
+
+        expect(result).not_to have_key("deployment_environment")
+      end
+    end
+
     describe "inyeccion de contexto de negocio" do
       let(:current_mock) do
         Class.new do

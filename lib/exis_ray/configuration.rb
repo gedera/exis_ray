@@ -40,6 +40,18 @@ module ExisRay
     #   @example 'MyLogSubscriber'
     attr_accessor :log_subscriber_class
 
+    # @!attribute [rw] service_version
+    #   @return [String, nil] Versión del servicio. Equivale a `service.version` de OTel.
+    #   Por defecto intenta leer `Rails.application.config.x.version` si Rails está disponible.
+    #   @example '1.2.3'
+    attr_accessor :service_version
+
+    # @!attribute [rw] deployment_environment
+    #   @return [String, nil] Entorno de despliegue. Equivale a `deployment.environment` de OTel.
+    #   Por defecto lee `Rails.env` si Rails está disponible.
+    #   @example 'production'
+    attr_accessor :deployment_environment
+
     # Inicializa la configuración con valores por defecto compatibles con AWS X-Ray.
     def initialize
       @trace_header = "HTTP_X_AMZN_TRACE_ID"
@@ -48,6 +60,39 @@ module ExisRay
       @current_class = "Current"
       @log_format = :text
       @log_subscriber_class = nil
+      @service_version = default_service_version
+      @deployment_environment = default_deployment_environment
+    end
+
+    # Lee la versión del servicio desde la configuración de Rails.
+    # Busca primero en `config.version` (atributo directo) y luego en `config.x.version`
+    # (custom config namespace). Retorna nil si ninguno está definido.
+    #
+    # @return [String, nil]
+    def default_service_version
+      return unless defined?(Rails) && Rails.application&.config
+
+      config = Rails.application.config
+
+      # Primero: config.version (atributo directo definido en Application)
+      version = config.version if config.respond_to?(:version)
+      return version.to_s if version.present?
+
+      # Fallback: config.x.version (custom config namespace)
+      if config.respond_to?(:x) && config.x.respond_to?(:version)
+        x_version = config.x.version
+        return x_version.to_s if x_version.present?
+      end
+
+      nil
+    rescue StandardError
+      nil
+    end
+
+    def default_deployment_environment
+      return unless defined?(Rails) && Rails.respond_to?(:env)
+
+      Rails.env.to_s
     end
 
     # Indica si la aplicación está configurada para emitir logs en formato estructurado (JSON).

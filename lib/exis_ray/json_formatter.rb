@@ -28,6 +28,16 @@ module ExisRay
     # Claves sensibles que deben filtrarse automáticamente según el estándar de Gabriel.
     SENSITIVE_KEYS = /password|pass|passwd|secret|token|api_key|auth/i
 
+    # Mapeo de severity_text OTel a SeverityNumber del Log Data Model.
+    # https://opentelemetry.io/docs/specs/otel/log/data-model/#field-severitynumber
+    SEVERITY_NUMBER = {
+      "DEBUG" => 5,
+      "INFO" => 9,
+      "WARN" => 13,
+      "ERROR" => 17,
+      "FATAL" => 21
+    }.freeze
+
     # Procesa un mensaje de log y lo formatea como una cadena estructurada en JSON.
     #
     # @param severity [String] El nivel de severidad del log (ej. "INFO", "ERROR", "DEBUG").
@@ -39,7 +49,10 @@ module ExisRay
       payload = {
         time: timestamp&.utc&.iso8601 || Time.now.utc.iso8601,
         level: severity,
-        service: ExisRay::Tracer.service_name
+        severity_number: SEVERITY_NUMBER[severity],
+        service: ExisRay::Tracer.service_name,
+        service_version: service_version,
+        deployment_environment: deployment_environment
       }
 
       inject_tracer_context(payload)
@@ -53,6 +66,16 @@ module ExisRay
     end
 
     private
+
+    # @return [String, nil]
+    def service_version
+      ExisRay.configuration.service_version
+    end
+
+    # @return [String, nil]
+    def deployment_environment
+      ExisRay.configuration.deployment_environment
+    end
 
     # Genera un JSON de fallback cuando el formateo principal falla.
     # Nunca debe lanzar una excepción.

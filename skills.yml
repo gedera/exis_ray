@@ -30,6 +30,11 @@ skills:
     environment:
       space_id: "${AGENT_REVIEW_SAPCE_ID}"
       list_id: "${AGENT_LIST_ID}"
+  action-plan:
+    repo: sequre/ai_knowledge
+    environment:
+      space_id: "${AGENT_REVIEW_SAPCE_ID}"
+      list_id: "${AGENT_ACTION_PLAN_LIST_ID}"
   documentation-writer:
     repo: github/awesome-copilot
     path: skills/documentation-writer

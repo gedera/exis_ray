@@ -101,7 +101,10 @@ ExisRay.configuration.json_logs?                # => true/false
 |:------|:----------|
 | `time` | Siempre |
 | `level` | Siempre |
+| `severity_number` | Siempre (OTel: DEBUG=5, INFO=9, WARN=13, ERROR=17, FATAL=21) |
 | `service` | Siempre |
+| `service_version` | Siempre (de `config.version` o `config.x.version`) |
+| `deployment_environment` | Siempre (de `Rails.env`) |
 | `root_id` | Cuando hay trace context activo |
 | `trace_id` | Cuando hay trace context activo |
 | `source` | Cuando hay trace context activo |

@@ -71,8 +71,8 @@ ExisRay unifica trazabilidad distribuida, logging estructurado JSON, contexto de
 2. `Tracer.parse_trace_id` extrae `root_id`, `self_id`, `called_from`, `total_time_so_far`
 3. `ExisRay.sync_correlation_id` asigna `Tracer.correlation_id` a `Current.correlation_id`
 4. Controller ejecuta `before_action` para setear `Current.user_id`, `Current.isp_id`
-5. `JsonFormatter` intercepta cada `Rails.logger.*` e inyecta automaticamente: `time`, `level`, `service`, `root_id`, `trace_id`, `source`, `user_id`, `isp_id`, `correlation_id`
-6. `LogSubscriber` emite un unico Hash al finalizar el request (method, path, status, duration_s, etc.)
+5. `JsonFormatter` intercepta cada `Rails.logger.*` e inyecta automaticamente: `time`, `level`, `severity_number`, `service`, `service_version`, `deployment_environment`, `root_id`, `trace_id`, `source`, `user_id`, `isp_id`, `correlation_id`
+6. `LogSubscriber` emite un unico Hash al finalizar el request (method, path, http_status, http_route, duration_s, user_agent_original, server_address, etc.)
 7. En llamadas salientes, `FaradayMiddleware`/`ActiveResourceInstrumentation` inyectan `propagation_trace_header` con `Tracer.generate_trace_header`
 8. Al finalizar, `ActiveSupport::CurrentAttributes` hace reset automatico
 
@@ -90,6 +90,8 @@ ExisRay.configure do |config|
   config.reporter_class          = "Reporter"               # String, default "Reporter"
   config.log_format              = :json                    # Symbol, :text (default) | :json
   config.log_subscriber_class    = "MyLogSubscriber"        # String|nil, default nil
+  config.service_version         = "1.2.3"                  # String|nil, default: Rails config.version o config.x.version
+  config.deployment_environment  = "production"             # String|nil, default: Rails.env
 end
 
 ExisRay.configuration.json_logs?  # => true si log_format == :json
@@ -201,7 +203,9 @@ Soporta Sentry moderno (`Sentry.capture_exception`) y legacy (`Session`/`Raven`)
 ExisRay::TaskMonitor.run("billing:generate_invoices") do
   InvoiceService.process_all
 end
-# Genera root_id propio, loguea task_started/task_finished con duration_s.
+# Genera root_id propio, loguea task_started/task_finished con outcome y duration_s.
+# En caso de error emite: error_class, error_message (legacy) + exception.type,
+# exception.message, exception.stacktrace (OTel, limitado a 20 lineas).
 # Re-lanza excepciones despues de loguearlas.
 # Hace reset de Tracer, Current y Reporter en ensure.
 ```

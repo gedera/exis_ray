@@ -1,3 +1,15 @@
+## [0.6.1] - 2026-04-05
+
+### Added
+- **`exception.type` / `exception.message` / `exception.stacktrace`** emitidos junto a los legacy `error_class` / `error_message` en `TaskMonitor` y `LogSubscriber`. Inicia la transición a la convención OTel — los legacy se removerán en v1.0. El stacktrace se toma de `payload[:exception_object]` y se limita a las primeras 20 líneas para respetar el formato one-line KV del estándar Wispro.
+- **`http_route`** en `LogSubscriber` con resolución en capas: (1) `payload[:request].route_uri_pattern` para Rails 7.1+, (2) fallback iterando `Rails.application.routes.routes` y matcheando por `defaults[:controller]`, `defaults[:action]` y verb HTTP. Normaliza el controller name CamelCase (incluyendo namespaces `Api::V1::Users`) al formato snake_case que Rails usa en `route.defaults`.
+
+### Fixed
+- **`TaskMonitor.format_stacktrace`**: maneja `e.backtrace == nil` de forma segura y está envuelto en rescue para que un logger roto nunca afecte el flujo principal.
+- **`private_class_method` restaurado** en `TaskMonitor`: `pod_identifier`, `setup_tracer`, `execute_with_optional_tags`, `log_event` y el nuevo `format_stacktrace` vuelven a ser privados (regresión de 0.6.0).
+- **`extract_exception_data`**: las keys ahora son symbols (`:error_class`, `:"exception.type"`, etc) para ser consistentes con el resto del payload. Antes mezclaba strings y symbols, lo que causaba inconsistencias al serializar.
+- **`extract_http_route`**: la implementación anterior matcheaba contra `route.requirements[:controller]`, pero Rails guarda controller/action en `route.defaults`. El método antes siempre retornaba `nil` en producción, aunque sus tests pasaban por stubear un contrato inventado. Tests reescritos para stubear la API real (`route.defaults`, `route.path.spec`, `route.verb`).
+
 ## [0.5.11] - 2026-04-04
 
 ### Documentación

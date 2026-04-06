@@ -242,14 +242,14 @@ task generate_invoices: :environment do
 end
 ```
 
-`TaskMonitor` genera un `root_id` nuevo, configura Reporter y Current, loguea `task_started`/`task_finished` con `duration_s` y `status`, y limpia el contexto al finalizar. Si el bloque lanza una excepción, la registra como `status=failed` y la re-lanza.
+`TaskMonitor` genera un `root_id` nuevo, configura Reporter y Current, loguea `task_started`/`task_finished` con `duration_s` y `outcome`, y limpia el contexto al finalizar. Si el bloque lanza una excepción, la registra como `outcome=failed` con `exception.type`, `exception.message` y `exception.stacktrace` (OTel) y la re-lanza.
 
 ## JSON Logging
 
 Con `log_format: :json`, `ExisRay::JsonFormatter` reemplaza el formatter de Rails y emite cada línea como JSON single-line con contexto inyectado automáticamente:
 
 ```json
-{"time":"2026-04-01T14:30:00Z","level":"INFO","service":"wispro_agent","root_id":"1-65f...abc","trace_id":"Root=1-65f...;Self=...","source":"http","user_id":42,"isp_id":10,"component":"exis_ray","event":"http_request","method":"GET","path":"/api/v1/users","status":200,"duration_s":0.0452}
+{"time":"2026-04-01T14:30:00Z","level":"INFO","severity_number":9,"service":"wispro_agent","service_version":"1.2.3","deployment_environment":"production","root_id":"1-65f...abc","trace_id":"Root=1-65f...;Self=...","source":"http","user_id":42,"isp_id":10,"component":"exis_ray","event":"http_request","method":"GET","path":"/api/v1/users","http_route":"/api/v1/users","http_status":200,"duration_s":0.0452,"user_agent_original":"Mozilla/5.0","server_address":"api.example.com"}
 ```
 
 Los mensajes con formato `key=value` se parsean y elevan al root del JSON. Los valores numéricos se castean automáticamente:
@@ -276,7 +276,10 @@ En modo `:text`, ExisRay inyecta el `trace_id` o `root_id` como tag de Rails (`c
 |:------|:----------|
 | `time` | Siempre (UTC ISO 8601) |
 | `level` | Siempre |
+| `severity_number` | Siempre (OTel SeverityNumber: DEBUG=5, INFO=9, WARN=13, ERROR=17, FATAL=21) |
 | `service` | Siempre (nombre de la app Rails en snake_case) |
+| `service_version` | Siempre (lee de `config.version` o `config.x.version`) |
+| `deployment_environment` | Siempre (lee de `Rails.env`) |
 | `root_id` | Cuando hay trace context activo |
 | `trace_id` | Cuando hay trace context activo |
 | `source` | Cuando hay trace context activo (`http`, `sidekiq`, `task`, `system`) |
@@ -286,6 +289,18 @@ En modo `:text`, ExisRay inyecta el `trace_id` o `root_id` como tag de Rails (`c
 | `sidekiq_job` | Solo en procesos Sidekiq |
 | `task` | Solo en procesos TaskMonitor |
 | `tags` | Solo si hay Rails tagged logging activo |
+
+`LogSubscriber` inyecta además estos campos en los logs de requests HTTP:
+
+| Campo | Descripción |
+|:------|:------------|
+| `http_status` | Código HTTP (Integer). Antes `status`, renombrado en v0.6.0 |
+| `http_route` | Template de ruta (ej: `/users/:id`). Resolución via `route.defaults` |
+| `user_agent_original` | Header `User-Agent` del request |
+| `server_address` | Hostname sin puerto del header `Host` |
+| `exception.type` | Clase de la excepción (cuando el request falla) |
+| `exception.message` | Mensaje de la excepción |
+| `exception.stacktrace` | Primeras 20 líneas del backtrace |
 
 ### Filtrado de claves sensibles
 

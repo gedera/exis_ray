@@ -1,3 +1,8 @@
+## [0.7.1] - 2026-04-06
+
+### Fixed
+- **`JsonFormatter` truncaba valores key=value sin comillas:** `KV_PARSE_RE` usaba `\S+` como fallback, cortando en el primer espacio. Ahora usa un lookahead que extiende el valor hasta el próximo token `key=` o fin de string. Ejemplo: `error_message=wrong number of arguments (given 1, expected 0)` ahora captura el valor completo en vez de truncar a `"wrong"`.
+
 ## [0.6.1] - 2026-04-05
 
 ### Added

@@ -56,8 +56,8 @@ module ExisRay
     def initialize
       @trace_header = "HTTP_X_AMZN_TRACE_ID"
       @propagation_trace_header = "X-Amzn-Trace-Id"
-      @reporter_class = "Reporter"
-      @current_class = "Current"
+      @reporter_class = nil
+      @current_class = nil
       @log_format = :text
       @log_subscriber_class = nil
       @service_version = default_service_version

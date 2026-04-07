@@ -14,12 +14,12 @@ RSpec.describe ExisRay::Configuration do
       expect(config.propagation_trace_header).to eq("X-Amzn-Trace-Id")
     end
 
-    it "reporter_class por defecto es Reporter" do
-      expect(config.reporter_class).to eq("Reporter")
+    it "reporter_class por defecto es nil" do
+      expect(config.reporter_class).to be_nil
     end
 
-    it "current_class por defecto es Current" do
-      expect(config.current_class).to eq("Current")
+    it "current_class por defecto es nil" do
+      expect(config.current_class).to be_nil
     end
 
     it "log_format por defecto es :text" do

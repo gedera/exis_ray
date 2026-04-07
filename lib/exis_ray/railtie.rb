@@ -38,22 +38,21 @@ module ExisRay
     # 3. Integraciones Post-Boot y Forzado de Formateadores
     # Se ejecuta una vez que las gemas y el entorno de Rails están completamente cargados.
     config.after_initialize do
-      # Validación de configuración: solo cuando eager_load=true (producción/staging),
-      # donde todos los constantes de app/ están garantizados. En desarrollo con lazy
-      # loading las clases pueden no estar cargadas aún en este punto.
-      if Rails.application.config.eager_load
-        if (name = ExisRay.configuration.current_class).present?
-          klass = name.safe_constantize
-          unless klass&.<=(ExisRay::Current)
-            raise "ExisRay: current_class '#{name}' not found or doesn't inherit from ExisRay::Current"
-          end
+      # Validación de configuración: verificamos que las clases configuradas
+      # hereden de los tipos base. Usamos warn en lugar de raise porque en
+      # Rails 8.1+ after_initialize puede correr antes de eager_load!,
+      # y safe_constantize puede fallar aún con eager_load=true.
+      if (name = ExisRay.configuration.current_class).present?
+        klass = name.safe_constantize
+        if klass && !klass.<=(ExisRay::Current)
+          raise "ExisRay: current_class '#{name}' does not inherit from ExisRay::Current"
         end
+      end
 
-        if (name = ExisRay.configuration.reporter_class).present?
-          klass = name.safe_constantize
-          unless klass&.<=(ExisRay::Reporter)
-            raise "ExisRay: reporter_class '#{name}' not found or doesn't inherit from ExisRay::Reporter"
-          end
+      if (name = ExisRay.configuration.reporter_class).present?
+        klass = name.safe_constantize
+        if klass && !klass.<=(ExisRay::Reporter)
+          raise "ExisRay: reporter_class '#{name}' does not inherit from ExisRay::Reporter"
         end
       end
 

@@ -287,6 +287,38 @@ RSpec.describe ExisRay::JsonFormatter do
 
       expect(result).to eq({ "msg" => "hello world" })
     end
+
+    it "captura valores sin comillas con espacios hasta el próximo key=" do
+      input = "event=unhandled_exception error_class=ArgumentError " \
+              "error_message=wrong number of arguments (given 1, expected 0)"
+      result = formatter.send(:parse_kv_string, input)
+
+      expect(result).to eq({
+                             "event" => "unhandled_exception",
+                             "error_class" => "ArgumentError",
+                             "error_message" => "wrong number of arguments (given 1, expected 0)"
+                           })
+    end
+
+    it "captura valores sin comillas con espacios al final del string" do
+      result = formatter.send(:parse_kv_string, "component=exis_ray event=something went wrong")
+
+      expect(result).to eq({
+                             "component" => "exis_ray",
+                             "event" => "something went wrong"
+                           })
+    end
+
+    it "mezcla valores con y sin comillas correctamente" do
+      result = formatter.send(:parse_kv_string, 'event=error msg="hello world" detail=some extra info status=500')
+
+      expect(result).to eq({
+                             "event" => "error",
+                             "msg" => "hello world",
+                             "detail" => "some extra info",
+                             "status" => 500
+                           })
+    end
   end
 
   describe "#filter_sensitive_hash (privado)" do

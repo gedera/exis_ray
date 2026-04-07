@@ -22,8 +22,9 @@ module ExisRay
     # Detecta si un string comienza con al menos un par key=value.
     KV_DETECT_RE = /\A\w+=/
 
-    # Extrae pares key=value de un string. Soporta valores sin espacios o entre comillas dobles/simples.
-    KV_PARSE_RE  = /(\w+)=("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\S+)/
+    # Extrae pares key=value de un string. Soporta valores entre comillas dobles/simples
+    # o valores sin comillas que se extienden hasta el próximo token key= o fin de string.
+    KV_PARSE_RE  = /(\w+)=("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|(?:(?!\s+\w+=).)+)/
 
     # Claves sensibles que deben filtrarse automáticamente según el estándar de Gabriel.
     SENSITIVE_KEYS = /password|pass|passwd|secret|token|api_key|auth/i
@@ -181,7 +182,7 @@ module ExisRay
         val = if value.start_with?('"', "'")
                 value[1..-2].to_s.gsub("\\#{value[0]}", value[0])
               else
-                value
+                value.strip
               end
 
         result[key] = cast_value(key, val)

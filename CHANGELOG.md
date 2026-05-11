@@ -1,3 +1,9 @@
+## [0.7.2] - 2026-05-11
+
+### Documentación
+- **Warning sobre `ActiveSupport::TaggedLogging` con JSON logging:** `TaggedLogging` antepone tags como texto raw antes del formatter, rompiendo el JSON (`[req_id] {...}`). `JsonFormatter` ya inyecta `request_id`/`trace_id` como campos JSON — usar ambos genera salida inválida. Documentada la config correcta del logger en `production.rb` (README + SKILL FAQ).
+- **Skill improvements (issue #4):** (1) Clarificado el criterio auto-inyectado vs manual — el formatter solo conoce contexto de ejecución (Tracer/Current), por eso `component` y `event` deben aportarse manualmente. (2) Agregados ejemplos concretos de output JSON lado-a-lado con el input KV/Hash. (3) Completada la lista de campos default de `LogSubscriber` (17 campos con tipos y condiciones, antes truncado con "etc."). (4) Documentados los 3 modos de input del formatter (KV / Hash / string libre) con ejemplos de cada uno.
+
 ## [0.7.1] - 2026-04-06
 
 ### Fixed

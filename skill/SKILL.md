@@ -290,6 +290,20 @@ Agrega `f.use ExisRay::FaradayMiddleware` al stack de Faraday. Solo inyecta head
 **P: Puedo usar ExisRay sin JSON logging?**
 Si. Con `log_format: :text` (default), ExisRay inyecta el `root_id` como tag de Rails via `config.log_tags`. El JsonFormatter y LogSubscriber no se activan.
 
+**P: Por que no usar `ActiveSupport::TaggedLogging` con JSON logging?**
+`TaggedLogging` agrega tags como texto plano al inicio de cada línea **antes** del formatter, lo cual rompe el JSON:
+```
+[request_id] {"time":"...","level":"INFO",...}   # ← texto antes del JSON
+```
+`ExisRay::JsonFormatter` ya inyecta los tags (`request_id`, `trace_id`, etc.) como campos JSON. Usar ambos genera JSON inválido.
+
+Configuración correcta en production.rb:
+```ruby
+config.colorize_logging = false
+config.logger = ActiveSupport::Logger.new(STDOUT)
+config.logger.formatter = ExisRay::JsonFormatter
+```
+
 **P: Que pasa con los logs de Sidekiq (el propio logger de Sidekiq)?**
 Si `json_logs?` es true, el Railtie asigna `Sidekiq.logger.formatter = ExisRay::JsonFormatter.new`, asi los logs internos de Sidekiq tambien salen en JSON.
 

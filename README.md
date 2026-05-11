@@ -268,6 +268,25 @@ Rails.logger.info "Algo pasó sin formato KV"
 
 En modo `:text`, ExisRay inyecta el `trace_id` o `root_id` como tag de Rails (`config.log_tags`) y no modifica el formatter.
 
+### Configuración del logger en producción
+
+Para logs JSON limpios sin códigos ANSI ni texto extra, configurar el logger así:
+
+```ruby
+# config/environments/production.rb
+config.colorize_logging = false
+config.logger = ActiveSupport::Logger.new(STDOUT)
+config.logger.formatter = ExisRay::JsonFormatter
+```
+
+**No usar `ActiveSupport::TaggedLogging`** — agrega tags como texto al inicio de cada línea antes del formatter, lo cual rompe el JSON:
+
+```
+[request_id] {"time":"...","level":"INFO",...}   # ← texto antes del JSON (INVALIDO)
+```
+
+`ExisRay::JsonFormatter` ya inyecta los tags (`request_id`, `trace_id`, etc.) como campos JSON, así que `TaggedLogging` es redundante e incompatible.
+
 ### Campos auto-inyectados
 
 `JsonFormatter` inyecta estos campos automáticamente en cada línea. **Nunca** los incluyas manualmente en tus logs:

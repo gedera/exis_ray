@@ -71,8 +71,8 @@ ExisRay unifica trazabilidad distribuida, logging estructurado JSON, contexto de
 2. `Tracer.parse_trace_id` extrae `root_id`, `self_id`, `called_from`, `total_time_so_far`
 3. `ExisRay.sync_correlation_id` asigna `Tracer.correlation_id` a `Current.correlation_id`
 4. Controller ejecuta `before_action` para setear `Current.user_id`, `Current.isp_id`
-5. `JsonFormatter` intercepta cada `Rails.logger.*` e inyecta automaticamente: `time`, `level`, `severity_number`, `service`, `service_version`, `deployment_environment`, `root_id`, `trace_id`, `source`, `user_id`, `isp_id`, `correlation_id`
-6. `LogSubscriber` emite un unico Hash al finalizar el request (method, path, http_status, http_route, duration_s, user_agent_original, server_address, etc.)
+5. `JsonFormatter` intercepta cada `Rails.logger.*` e inyecta automaticamente: `time`, `level`, `severity_number`, `service`, `service_version`, `deployment_environment`, `root_id`, `trace_id`, `source`, `user_id`, `isp_id`, `correlation_id`. El developer aporta `component` (modulo de negocio) y `event` (que paso); estos NO son auto-inyectados porque dependen del call site, no del contexto de ejecucion.
+6. `LogSubscriber` emite un unico Hash al finalizar el request con campos default (`component`, `event`, `method`, `path`, `http_route`, `format`, `controller`, `action`, `http_status`, `duration_s`, `duration_human`, `view_runtime_s`, `db_runtime_s`, `user_agent_original`, `server_address`, y en error `error_class`/`error_message`/`exception.*`).
 7. En llamadas salientes, `FaradayMiddleware`/`ActiveResourceInstrumentation` inyectan `propagation_trace_header` con `Tracer.generate_trace_header`
 8. Al finalizar, `ActiveSupport::CurrentAttributes` hace reset automatico
 
@@ -212,6 +212,32 @@ end
 
 ### ExisRay::LogSubscriber
 
+Reemplaza Lograge. Se suscribe a `process_action.action_controller` y emite un Hash por request HTTP. Severity es `ERROR` si `http_status >= 500`, sino `INFO`.
+
+**Campos default emitidos** (mergeados al payload JSON; nunca duplicarlos manualmente):
+
+| Campo | Tipo | Notas |
+|:------|:-----|:------|
+| `component` | String | Siempre `"exis_ray"` |
+| `event` | String | Siempre `"http_request"` |
+| `method` | String | Verbo HTTP |
+| `path` | String | URL concreta del request |
+| `http_route` | String | Template (ej: `/users/:id`). Baja cardinalidad para dashboards |
+| `format` | Symbol/String | `html`, `json`, etc. |
+| `controller` | String | Class name del controller |
+| `action` | String | Nombre del action |
+| `http_status` | Integer | Status HTTP final |
+| `duration_s` | Float | Segundos (Rails reporta ms, se convierte), redondeo 4 decimales |
+| `duration_human` | String | Legible: `"42.5ms"`, `"1.25s"`, `"2 minutes 5 seconds"` |
+| `view_runtime_s` | Float\|nil | Solo si Rails lo reporta |
+| `db_runtime_s` | Float\|nil | Solo si ActiveRecord lo reporta |
+| `user_agent_original` | String | Header `User-Agent` |
+| `server_address` | String | Hostname sin puerto (de `Host` header) |
+| `error_class`, `error_message` | String | Solo en fallo (legacy) |
+| `exception.type`, `exception.message`, `exception.stacktrace` | String | Solo en fallo (OTel; stack limitado a 20 lineas) |
+
+Para inyectar campos extra, sobreescribir `extra_fields`:
+
 ```ruby
 class MyLogSubscriber < ExisRay::LogSubscriber
   def self.extra_fields(event)
@@ -227,11 +253,40 @@ ExisRay.configure { |c| c.log_subscriber_class = "MyLogSubscriber" }
 
 Se asigna automaticamente a `Rails.logger.formatter` cuando `log_format: :json`. Acepta tres tipos de mensaje:
 
-- **Hash**: merge directo al payload JSON
-- **String KV** (`"event=foo bar=baz"`): parsea pares y los eleva al root del JSON
-- **String libre**: asigna al campo `body`
+- **Hash**: merge directo al payload JSON. Util para payloads complejos o con valores nested.
+- **String KV** (`"event=foo bar=baz"`): parsea pares y los eleva al root del JSON. Util para one-liners rapidos.
+- **String libre**: asigna al campo `body` (OTel log body).
 
 Casteo automatico: integers, floats, objetos JSON (`{...}`, `[...]`). Filtra claves sensibles (`password|secret|token|api_key|auth`) a `[FILTERED]`. Fallback a JSON minimo si el formateo falla.
+
+#### Criterio auto-inyectado vs manual
+
+- **Auto-inyectado** (formatter conoce desde `Tracer`/`Current`): contexto de **ejecucion** — quien hace el request, de donde viene, en que servicio, con que identidad.
+- **Manual** (lo aporta cada `Rails.logger.*`): contexto del **call site** — que modulo (`component`) y que paso (`event`). El formatter no puede saber esto sin recorrer el stack en cada log.
+
+Por eso `component` y `event` jamas se auto-inyectan, aunque el estandar Wispro los exija.
+
+#### Ejemplos: KV vs Hash producen output equivalente
+
+```ruby
+# KV string — one-liner rapido
+Rails.logger.info("component=billing event=invoice_paid invoice_id=42 total=199.99")
+
+# Hash style — payloads complejos / nested
+Rails.logger.info(component: "billing", event: "invoice_paid",
+                  invoice: { id: 42, total: 199.99 })
+
+# String libre — fallback, va a `body`
+Rails.logger.info("usuario hizo click")
+```
+
+#### Output JSON resultante (mismo para KV y Hash del ejemplo)
+
+```json
+{"time":"2026-05-11T09:15:00.123Z","level":"INFO","severity_number":9,"service":"box_radius_manager","service_version":"1.2.3","deployment_environment":"production","root_id":"1-abc","trace_id":"Root=1-abc;Self=...","source":"http","user_id":42,"isp_id":10,"correlation_id":"box_radius_manager;1-abc","component":"billing","event":"invoice_paid","invoice_id":42,"total":199.99}
+```
+
+Los campos hasta `correlation_id` los inyecta el formatter automaticamente. De `component` en adelante son los campos del mensaje del developer.
 
 ### Middlewares de propagacion
 
@@ -289,6 +344,20 @@ Agrega `f.use ExisRay::FaradayMiddleware` al stack de Faraday. Solo inyecta head
 
 **P: Puedo usar ExisRay sin JSON logging?**
 Si. Con `log_format: :text` (default), ExisRay inyecta el `root_id` como tag de Rails via `config.log_tags`. El JsonFormatter y LogSubscriber no se activan.
+
+**P: Por que no usar `ActiveSupport::TaggedLogging` con JSON logging?**
+`TaggedLogging` agrega tags como texto plano al inicio de cada línea **antes** del formatter, lo cual rompe el JSON:
+```
+[request_id] {"time":"...","level":"INFO",...}   # ← texto antes del JSON
+```
+`ExisRay::JsonFormatter` ya inyecta los tags (`request_id`, `trace_id`, etc.) como campos JSON. Usar ambos genera JSON inválido.
+
+Configuración correcta en production.rb:
+```ruby
+config.colorize_logging = false
+config.logger = ActiveSupport::Logger.new(STDOUT)
+config.logger.formatter = ExisRay::JsonFormatter
+```
 
 **P: Que pasa con los logs de Sidekiq (el propio logger de Sidekiq)?**
 Si `json_logs?` es true, el Railtie asigna `Sidekiq.logger.formatter = ExisRay::JsonFormatter.new`, asi los logs internos de Sidekiq tambien salen en JSON.

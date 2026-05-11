@@ -252,19 +252,24 @@ Con `log_format: :json`, `ExisRay::JsonFormatter` reemplaza el formatter de Rail
 {"time":"2026-04-01T14:30:00Z","level":"INFO","severity_number":9,"service":"wispro_agent","service_version":"1.2.3","deployment_environment":"production","root_id":"1-65f...abc","trace_id":"Root=1-65f...;Self=...","source":"http","user_id":42,"isp_id":10,"component":"exis_ray","event":"http_request","method":"GET","path":"/api/v1/users","http_route":"/api/v1/users","http_status":200,"duration_s":0.0452,"user_agent_original":"Mozilla/5.0","server_address":"api.example.com"}
 ```
 
-Los mensajes con formato `key=value` se parsean y elevan al root del JSON. Los valores numéricos se castean automáticamente:
+El formatter acepta tres tipos de mensaje. Los tres producen output JSON equivalente; elegí el que sea más legible para tu caso:
 
 ```ruby
+# 1. String KV — one-liner rápido, valores numéricos se castean
 Rails.logger.info "component=billing event=invoice_created invoice_id=123 total=45.50"
-# => {"time":"...","level":"INFO","service":"...","root_id":"...","component":"billing","event":"invoice_created","invoice_id":123,"total":45.5}
-```
 
-Los mensajes tipo Hash (usados internamente por `LogSubscriber`) se mergean directamente. Los mensajes de texto libre se asignan a la clave `body`:
+# 2. Hash style — payloads complejos o con valores nested
+Rails.logger.info(component: "billing", event: "invoice_created",
+                  invoice: { id: 123, total: 45.50 })
 
-```ruby
+# 3. String libre — fallback, va a la clave `body`
 Rails.logger.info "Algo pasó sin formato KV"
 # => {"time":"...","level":"INFO","service":"...","body":"Algo pasó sin formato KV"}
 ```
+
+Los mensajes Hash también son la forma que usa internamente `LogSubscriber` para emitir el cierre de cada request HTTP.
+
+> **Nota:** `component` (módulo de negocio) y `event` (qué pasó) **no** son auto-inyectados — los aporta el call site. El formatter solo conoce el contexto de **ejecución** (quién, de dónde, con qué identidad), no el contexto del **lugar del código** que loguea.
 
 En modo `:text`, ExisRay inyecta el `trace_id` o `root_id` como tag de Rails (`config.log_tags`) y no modifica el formatter.
 
@@ -309,17 +314,29 @@ config.logger.formatter = ExisRay::JsonFormatter
 | `task` | Solo en procesos TaskMonitor |
 | `tags` | Solo si hay Rails tagged logging activo |
 
-`LogSubscriber` inyecta además estos campos en los logs de requests HTTP:
+`LogSubscriber` inyecta además estos campos en cada log de cierre de request HTTP. **Nunca duplicarlos** en logs manuales:
 
-| Campo | Descripción |
-|:------|:------------|
-| `http_status` | Código HTTP (Integer). Antes `status`, renombrado en v0.6.0 |
-| `http_route` | Template de ruta (ej: `/users/:id`). Resolución via `route.defaults` |
-| `user_agent_original` | Header `User-Agent` del request |
-| `server_address` | Hostname sin puerto del header `Host` |
-| `exception.type` | Clase de la excepción (cuando el request falla) |
-| `exception.message` | Mensaje de la excepción |
-| `exception.stacktrace` | Primeras 20 líneas del backtrace |
+| Campo | Tipo | Notas |
+|:------|:-----|:------|
+| `component` | String | Siempre `"exis_ray"` |
+| `event` | String | Siempre `"http_request"` |
+| `method` | String | Verbo HTTP |
+| `path` | String | URL concreta del request |
+| `http_route` | String | Template (ej: `/users/:id`). Baja cardinalidad para dashboards |
+| `format` | Symbol/String | `html`, `json`, etc. |
+| `controller` | String | Class name del controller |
+| `action` | String | Nombre del action |
+| `http_status` | Integer | Status HTTP final. Antes `status`, renombrado en v0.6.0 |
+| `duration_s` | Float | Segundos (Rails reporta ms, se convierte), redondeo 4 decimales |
+| `duration_human` | String | Legible: `"42.5ms"`, `"1.25s"`, `"2 minutes 5 seconds"` |
+| `view_runtime_s` | Float\|nil | Solo si Rails lo reporta |
+| `db_runtime_s` | Float\|nil | Solo si ActiveRecord lo reporta |
+| `user_agent_original` | String | Header `User-Agent` |
+| `server_address` | String | Hostname sin puerto del header `Host` |
+| `error_class`, `error_message` | String | Solo en fallo (legacy) |
+| `exception.type`, `exception.message`, `exception.stacktrace` | String | Solo en fallo (OTel; stack limitado a 20 líneas) |
+
+Severity del log: `ERROR` si `http_status >= 500`, sino `INFO`.
 
 ### Filtrado de claves sensibles
 

@@ -92,12 +92,29 @@ ExisRay.configure do |config|
   config.log_subscriber_class    = "MyLogSubscriber"        # String|nil, default nil
   config.service_version         = "1.2.3"                  # String|nil, default: Rails config.version o config.x.version
   config.deployment_environment  = "production"             # String|nil, default: Rails.env
+  config.global_fields           = { tenant_id: ENV.fetch("TENANT_ID") } # Hash, default {}
 end
 
 ExisRay.configuration.json_logs?  # => true si log_format == :json
 ```
 
 Las clases se pasan como String para evitar `uninitialized constant` durante boot. Se resuelven via `safe_constantize`. En produccion se memoizan; en desarrollo se resuelven en cada request para soportar Zeitwerk reloading.
+
+#### global_fields
+
+Campos fijos por proceso inyectados en cada log line. Pensado para constantes de proceso en servicios multi-tenant (`TENANT_ID`, `SERVICE_ID`, `STACK_ID`). El hash se filtra (claves sensibles → `[FILTERED]`) y se congela al setear, por lo que el cost por log line es despreciable y los valores son inmutables durante la vida del proceso.
+
+Precedencia: el contexto del Tracer/Current y los campos del propio mensaje pisan `global_fields` en colisión. Por eso `global_fields` no sirve para overrideear campos canónicos (`service`, `trace_id`, etc.), solo para agregar nuevos.
+
+```ruby
+ExisRay.configure do |config|
+  config.global_fields = {
+    tenant_id: ENV.fetch("TENANT_ID"),
+    service_id: ENV.fetch("SERVICE_ID"),
+    stack_id: ENV.fetch("STACK_ID")
+  }
+end
+```
 
 ### ExisRay::Tracer
 

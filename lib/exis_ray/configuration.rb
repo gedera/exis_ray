@@ -52,6 +52,21 @@ module ExisRay
     #   @example 'production'
     attr_accessor :deployment_environment
 
+    # @!attribute [r] global_fields
+    #   @return [Hash] Campos fijos por proceso que se inyectan en cada línea de log.
+    #   Útil para constantes de proceso (TENANT_ID, SERVICE_ID, STACK_ID) en servicios multi-tenant.
+    #   El hash se filtra (claves sensibles → [FILTERED]) y se congela al setear, por lo que los
+    #   valores son inmutables durante la vida del proceso y el cost por log line es despreciable.
+    #   Precedencia: los campos canónicos del Tracer/Current y los del propio mensaje pisan
+    #   global_fields en caso de colisión. Default `{}`.
+    #   @example
+    #     config.global_fields = { tenant_id: ENV.fetch("TENANT_ID"), stack_id: ENV.fetch("STACK_ID") }
+    attr_reader :global_fields
+
+    # Claves sensibles que deben filtrarse automáticamente. Espejo de
+    # {ExisRay::JsonFormatter::SENSITIVE_KEYS} para evitar duplicar la regex al boot.
+    SENSITIVE_KEYS = /password|pass|passwd|secret|token|api_key|auth/i
+
     # Inicializa la configuración con valores por defecto compatibles con AWS X-Ray.
     def initialize
       @trace_header = "HTTP_X_AMZN_TRACE_ID"
@@ -62,6 +77,16 @@ module ExisRay
       @log_subscriber_class = nil
       @service_version = default_service_version
       @deployment_environment = default_deployment_environment
+      @global_fields = {}.freeze
+    end
+
+    # Setea los campos fijos por proceso. El hash se normaliza (filtrado de claves sensibles)
+    # y se congela para garantizar inmutabilidad runtime y mover el cost al boot.
+    #
+    # @param hash [Hash, nil] Pares clave/valor a inyectar en cada log. `nil` se trata como `{}`.
+    # @return [Hash] El hash normalizado y congelado.
+    def global_fields=(hash)
+      @global_fields = normalize_global_fields(hash)
     end
 
     # Lee la versión del servicio desde la configuración de Rails.
@@ -100,6 +125,22 @@ module ExisRay
     # @return [Boolean] `true` si `log_format` es `:json`, `false` en caso contrario.
     def json_logs?
       @log_format == :json
+    end
+
+    private
+
+    # Normaliza el hash de global_fields: descarta nil, filtra claves sensibles, y congela
+    # tanto el hash como sus valores string (para evitar mutaciones runtime).
+    #
+    # @param hash [Hash, nil]
+    # @return [Hash] hash congelado.
+    def normalize_global_fields(hash)
+      return {}.freeze if hash.nil? || hash.empty?
+
+      filtered = hash.each_with_object({}) do |(k, v), acc|
+        acc[k] = k.to_s.match?(SENSITIVE_KEYS) ? "[FILTERED]" : v
+      end
+      filtered.freeze
     end
   end
 end

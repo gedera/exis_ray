@@ -56,6 +56,7 @@ module ExisRay
         deployment_environment: deployment_environment
       }
 
+      inject_global_fields(payload)
       inject_tracer_context(payload)
       inject_business_context(payload)
       inject_current_tags(payload)
@@ -95,6 +96,21 @@ module ExisRay
       "#{JSON.generate(fallback)}\n"
     rescue StandardError
       "#{JSON.generate({ time: Time.now.utc.iso8601, level: severity, body: "log_error" })}\n"
+    end
+
+    # Inyecta los campos fijos por proceso configurados en {Configuration#global_fields}.
+    # El hash ya viene pre-filtrado y congelado desde el setter, por lo que aquí solo se
+    # mergea. Se invoca antes del contexto de tracer/current/mensaje, lo que implica que
+    # cualquier colisión con campos canónicos o con keys del mensaje del developer es ganada
+    # por estos últimos (override por call site).
+    #
+    # @param payload [Hash]
+    # @return [void]
+    def inject_global_fields(payload)
+      fields = ExisRay.configuration.global_fields
+      return if fields.empty?
+
+      payload.merge!(fields)
     end
 
     # Inyecta los identificadores de trazabilidad distribuida en el payload.

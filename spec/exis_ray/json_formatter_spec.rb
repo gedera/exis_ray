@@ -321,6 +321,66 @@ RSpec.describe ExisRay::JsonFormatter do
     end
   end
 
+  describe "Configuration#global_fields integration" do
+    around do |example|
+      original = ExisRay.configuration.global_fields
+      example.run
+    ensure
+      ExisRay.configuration.global_fields = original
+    end
+
+    it "inyecta los campos fijos en cada log line" do
+      ExisRay.configuration.global_fields = { tenant_id: "42", stack_id: "edge-1" }
+
+      result = call("event=boot")
+
+      expect(result).to include("tenant_id" => "42", "stack_id" => "edge-1", "event" => "boot")
+    end
+
+    it "default vacío no agrega campos extras al payload (solo canónicos compactados)" do
+      ExisRay.configuration.global_fields = {}
+
+      result = call("event=boot")
+
+      # `service_version` y `deployment_environment` quedan nil y se eliminan por compact
+      expect(result.keys).to contain_exactly("time", "level", "severity_number", "service", "event")
+    end
+
+    it "el mensaje del developer pisa global_fields (override por call site)" do
+      ExisRay.configuration.global_fields = { tenant_id: "42" }
+
+      result = call("event=override tenant_id=99")
+
+      expect(result["tenant_id"]).to eq(99)
+    end
+
+    it "el contexto del Tracer pisa global_fields en caso de colisión con campos canónicos" do
+      stub_const("ExisRay::Tracer", Module.new do
+        def self.service_name = "test-service"
+        def self.root_id      = "root-canonical"
+        def self.trace_id     = "trace-canonical"
+        def self.sidekiq_job  = nil
+        def self.task         = nil
+        def self.source       = nil
+      end)
+      ExisRay.configuration.global_fields = { root_id: "global-loses", custom: "ok" }
+
+      result = call("event=boot")
+
+      expect(result["root_id"]).to eq("root-canonical")
+      expect(result["custom"]).to eq("ok")
+    end
+
+    it "filtra claves sensibles configuradas en global_fields" do
+      ExisRay.configuration.global_fields = { api_key: ENV["FAKE_KEY"] || "supersecret", tenant_id: "42" }
+
+      result = call("event=boot")
+
+      expect(result["api_key"]).to eq("[FILTERED]")
+      expect(result["tenant_id"]).to eq("42")
+    end
+  end
+
   describe "#filter_sensitive_hash (privado)" do
     it "filtra claves sensibles en el nivel raíz" do
       result = formatter.send(:filter_sensitive_hash, { user: "gabriel", password: "secret" })

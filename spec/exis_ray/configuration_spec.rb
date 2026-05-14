@@ -37,6 +37,57 @@ RSpec.describe ExisRay::Configuration do
     it "deployment_environment por defecto es nil fuera de Rails" do
       expect(config.deployment_environment).to be_nil
     end
+
+    it "global_fields por defecto es un hash vacío congelado" do
+      expect(config.global_fields).to eq({})
+      expect(config.global_fields).to be_frozen
+    end
+  end
+
+  describe "#global_fields=" do
+    let(:config) { described_class.new }
+
+    it "asigna el hash provisto" do
+      config.global_fields = { tenant_id: "42", stack_id: "edge-1" }
+
+      expect(config.global_fields).to eq(tenant_id: "42", stack_id: "edge-1")
+    end
+
+    it "congela el hash para garantizar inmutabilidad runtime" do
+      config.global_fields = { tenant_id: "42" }
+
+      expect(config.global_fields).to be_frozen
+      expect { config.global_fields[:tenant_id] = "99" }.to raise_error(FrozenError)
+    end
+
+    it "filtra claves sensibles reemplazando el valor por [FILTERED]" do
+      config.global_fields = { tenant_id: "42", api_key: "secret", token: "abc" }
+
+      expect(config.global_fields[:tenant_id]).to eq("42")
+      expect(config.global_fields[:api_key]).to eq("[FILTERED]")
+      expect(config.global_fields[:token]).to eq("[FILTERED]")
+    end
+
+    it "trata nil como hash vacío" do
+      config.global_fields = nil
+
+      expect(config.global_fields).to eq({})
+      expect(config.global_fields).to be_frozen
+    end
+
+    it "trata hash vacío como hash vacío congelado" do
+      config.global_fields = {}
+
+      expect(config.global_fields).to eq({})
+      expect(config.global_fields).to be_frozen
+    end
+
+    it "soporta claves string para filtrado de sensibles" do
+      config.global_fields = { "password" => "x", "tenant_id" => "42" }
+
+      expect(config.global_fields["password"]).to eq("[FILTERED]")
+      expect(config.global_fields["tenant_id"]).to eq("42")
+    end
   end
 
   describe "resource attributes OTel" do

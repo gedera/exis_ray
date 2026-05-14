@@ -120,8 +120,24 @@ ExisRay.configure do |config|
 
   # Subclase de LogSubscriber para campos HTTP extra (opcional)
   # config.log_subscriber_class = "MyLogSubscriber"
+
+  # Campos fijos por proceso inyectados en cada log (opcional).
+  # Útil para servicios multi-tenant. El hash se filtra (claves sensibles → [FILTERED])
+  # y se congela al setear, así que el cost por log line es despreciable.
+  # config.global_fields = {
+  #   tenant_id: ENV.fetch("TENANT_ID"),
+  #   service_id: ENV.fetch("SERVICE_ID"),
+  #   stack_id: ENV.fetch("STACK_ID")
+  # }
 end
 ```
+
+### Precedencia de `global_fields`
+
+`global_fields` se mergea **antes** que el contexto del Tracer/Current y el cuerpo del mensaje. Esto significa:
+
+- Los campos canónicos (`service`, `trace_id`, `root_id`, `user_id`, etc.) **pisan** `global_fields` si hay colisión: no podés usarlo para overrideear esos campos, solo para agregar nuevos.
+- Las keys que aparezcan en el mensaje del developer (ej. `Rails.logger.info "tenant_id=99"`) **pisan** `global_fields` por call site, permitiendo override puntual.
 
 ## Clases de la App Host
 
@@ -304,6 +320,7 @@ config.logger.formatter = ExisRay::JsonFormatter
 | `service` | Siempre (nombre de la app Rails en snake_case) |
 | `service_version` | Siempre (lee de `config.version` o `config.x.version`) |
 | `deployment_environment` | Siempre (lee de `Rails.env`) |
+| `config.global_fields` (cualquier key) | Si `config.global_fields` no está vacío |
 | `root_id` | Cuando hay trace context activo |
 | `trace_id` | Cuando hay trace context activo |
 | `source` | Cuando hay trace context activo (`http`, `sidekiq`, `task`, `system`) |

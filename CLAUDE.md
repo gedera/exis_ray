@@ -105,6 +105,7 @@ ExisRay.configuration.json_logs?                # => true/false
 | `service` | Siempre |
 | `service_version` | Siempre (de `config.version` o `config.x.version`) |
 | `deployment_environment` | Siempre (de `Rails.env`) |
+| `global_fields` (cualquiera) | Si `config.global_fields` no vacío; pisable por tracer/current/mensaje |
 | `root_id` | Cuando hay trace context activo |
 | `trace_id` | Cuando hay trace context activo |
 | `source` | Cuando hay trace context activo |
@@ -176,6 +177,7 @@ ExisRay.configure do |config|
   config.propagation_trace_header = 'X-Amzn-Trace-Id'
   config.current_class           = 'Current'
   config.reporter_class          = 'Reporter'
+  config.global_fields           = { tenant_id: ENV.fetch('TENANT_ID') } # opcional
 end
 
 # BugBunny publisher — debe agregarse manualmente al cliente

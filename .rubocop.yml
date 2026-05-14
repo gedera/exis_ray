@@ -1,8 +1,54 @@
 AllCops:
   TargetRubyVersion: 3.2
+  NewCops: disable
+  SuggestExtensions: false
 
 Style/StringLiterals:
   EnforcedStyle: double_quotes
 
 Style/StringLiteralsInInterpolation:
   EnforcedStyle: double_quotes
+
+# Specs naturalmente acumulan blocks largos (describe/context/it). Relajar acá
+# evita el ruido sin perder señal real. El bloque after_initialize del Railtie
+# es lineal pero largo por la lista de gemas auto-instrumentadas.
+Metrics/BlockLength:
+  Exclude:
+    - "spec/**/*"
+    - "*.gemspec"
+    - "lib/exis_ray/railtie.rb"
+
+# Reporter/Current/Tracer subclasses dummy dentro de RSpec.describe son patron
+# estandar para evitar el problema de nombre nil en ActiveSupport::CurrentAttributes.
+Lint/ConstantDefinitionInBlock:
+  Exclude:
+    - "spec/**/*"
+
+# El estándar de logging de Wispro requiere que TODA operación de logging vaya
+# envuelta en `rescue StandardError` para que un fallo en logging nunca afecte
+# el flujo principal. Esos rescues son intencionalmente vacíos (o devuelven nil).
+Lint/SuppressedException:
+  Enabled: false
+
+# Thresholds más laxos para lib/: el código de instrumentación naturalmente
+# tiene métodos con varios respond_to? guards y branches. Refactorizar a
+# métodos más chicos haría más difícil de leer, no menos.
+Metrics/MethodLength:
+  Max: 35
+Metrics/AbcSize:
+  Max: 40
+Metrics/CyclomaticComplexity:
+  Max: 12
+Metrics/PerceivedComplexity:
+  Max: 12
+Metrics/ClassLength:
+  Max: 200
+
+Layout/LineLength:
+  Max: 130
+
+# La gema soporta Ruby >= 2.6 (ver gemspec) pero el dev env usa Ruby 3.x.
+# El mismatch es intencional — no requerimos que el dev environment matchee
+# el piso de Ruby soportado.
+Gemspec/RequiredRubyVersion:
+  Enabled: false

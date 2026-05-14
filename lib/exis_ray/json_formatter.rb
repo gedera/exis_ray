@@ -122,9 +122,7 @@ module ExisRay
       payload[:user_id] = curr.user_id if curr.respond_to?(:user_id) && !curr.user_id.nil?
       payload[:isp_id]  = curr.isp_id  if curr.respond_to?(:isp_id)  && !curr.isp_id.nil?
 
-      if curr.respond_to?(:correlation_id) && curr.correlation_id
-        payload[:correlation_id] = curr.correlation_id
-      end
+      payload[:correlation_id] = curr.correlation_id if curr.respond_to?(:correlation_id) && curr.correlation_id
 
       inject_log_fields(payload, curr)
     end

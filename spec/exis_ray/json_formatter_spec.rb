@@ -261,6 +261,91 @@ RSpec.describe ExisRay::JsonFormatter do
         expect(result).not_to have_key("user_id")
       end
     end
+
+    describe "inyeccion de Current.log_fields" do
+      # Mock estilo ActiveSupport::CurrentAttributes que combina los atributos canónicos
+      # con un hook log_fields. Por defecto retorna {}, los tests lo redefinen vía stub.
+      let(:current_class_double) do
+        Class.new do
+          class << self
+            attr_accessor :user_id, :isp_id, :correlation_id, :_log_fields
+
+            def respond_to_missing?(method, *)
+              %i[user_id isp_id correlation_id log_fields].include?(method) || super
+            end
+          end
+
+          def self.log_fields
+            _log_fields || {}
+          end
+        end
+      end
+
+      before do
+        allow(ExisRay).to receive(:current_class).and_return(current_class_double)
+      end
+
+      it "inyecta los campos retornados por log_fields en el payload" do
+        current_class_double._log_fields = { tenant_id: "42", region: "us-east-1" }
+
+        result = call("event=boot")
+
+        # tenant_id="42" se castea a Integer por filter_sensitive_hash (igual que cualquier otro KV)
+        expect(result).to include("tenant_id" => 42, "region" => "us-east-1", "event" => "boot")
+      end
+
+      it "no agrega keys cuando log_fields retorna hash vacío" do
+        current_class_double._log_fields = {}
+
+        result = call("event=boot")
+
+        expect(result).not_to have_key("tenant_id")
+      end
+
+      it "no agrega keys cuando log_fields retorna nil" do
+        current_class_double._log_fields = nil
+
+        result = call("event=boot")
+
+        expect(result.keys).to contain_exactly("time", "level", "severity_number", "service", "event")
+      end
+
+      it "el mensaje del developer pisa log_fields (override por call site)" do
+        current_class_double._log_fields = { tenant_id: "from-current" }
+
+        result = call("event=override tenant_id=from-message")
+
+        expect(result["tenant_id"]).to eq("from-message")
+      end
+
+      it "filtra claves sensibles" do
+        current_class_double._log_fields = { api_key: "leaked", tenant_id: "42" }
+
+        result = call("event=boot")
+
+        expect(result["api_key"]).to eq("[FILTERED]")
+        expect(result["tenant_id"]).to eq(42)
+      end
+
+      it "no rompe el formatter si la subclass overrideó log_fields con un método que revienta" do
+        allow(current_class_double).to receive(:log_fields).and_raise(StandardError, "boom")
+
+        expect { call("event=boot") }.not_to raise_error
+        result = call("event=boot")
+        expect(result["event"]).to eq("boot")
+      end
+
+      it "no falla si Current configurado no implementa log_fields (backwards compat)" do
+        legacy_current = Class.new do
+          class << self
+            attr_accessor :user_id, :isp_id, :correlation_id
+          end
+        end
+        allow(ExisRay).to receive(:current_class).and_return(legacy_current)
+
+        expect { call("event=boot") }.not_to raise_error
+      end
+    end
   end
 
   describe "#kv_string? (privado)" do

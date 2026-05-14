@@ -151,6 +151,38 @@ end
 | `Current.user?` / `Current.isp?` | Predicate: true si el ID no es nil |
 | `Current.correlation_id?` | Predicate: true si está presente (no vacío) |
 
+#### Hook `log_fields` — inyectar campos custom en cada log
+
+`Current.log_fields` es un class method overridable que retorna un Hash de campos
+extra a inyectar en cada log line, junto a `user_id`/`isp_id`/`correlation_id`.
+Cubre tanto **constantes de proceso** (declaradas como frozen constants en la
+subclass) como **valores dinámicos per-request** (leídos de atributos de
+`Current`) — todo en un solo lugar.
+
+```ruby
+class Current < ExisRay::Current
+  TENANT_ID = ENV.fetch("TENANT_ID").freeze   # static, frozen al boot
+  attribute :region                             # dynamic, per-request
+
+  def self.log_fields
+    { tenant_id: TENANT_ID, region: region }.compact
+  end
+end
+
+# En un before_action / middleware:
+Current.region = request.headers["X-Region"]
+
+# Los logs salen automáticamente con tenant_id y region:
+# {"...":"...", "tenant_id":"42", "region":"us-east-1", "event":"..."}
+```
+
+**Reglas:**
+
+- Default `{}` — cero overhead si no se override.
+- `JsonFormatter` filtra claves sensibles del hash retornado (`api_key`, `token`, etc.).
+- Si el override revienta, el formatter lo rescata silenciosamente (logging nunca debe afectar el flujo principal).
+- **Precedencia**: los campos canónicos del Tracer (`trace_id`, `root_id`, etc.) y las keys del propio mensaje del developer (ej. `Rails.logger.info "tenant_id=99"`) pisan `log_fields`. No sirve para overrideear campos canónicos, solo para agregar nuevos.
+
 ### Reporter (reporte de errores)
 
 `ExisRay::Reporter` es un wrapper de Sentry que enriquece automáticamente cada evento con el trace context del `Tracer` y el contexto de negocio del `Current`. Soporta Sentry SDK moderno y legacy (Raven/Session).
@@ -310,6 +342,7 @@ config.logger.formatter = ExisRay::JsonFormatter
 | `correlation_id` | Cuando `Current.correlation_id` está presente |
 | `user_id` | Cuando `Current.user_id` no es nil |
 | `isp_id` | Cuando `Current.isp_id` no es nil |
+| `Current.log_fields` (cualquier key) | Si la subclass overrideó el hook y retornó un Hash no vacío |
 | `sidekiq_job` | Solo en procesos Sidekiq |
 | `task` | Solo en procesos TaskMonitor |
 | `tags` | Solo si hay Rails tagged logging activo |

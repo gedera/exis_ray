@@ -163,6 +163,27 @@ Current.correlation_id? # => true si correlation_id es present?
 
 Los setters auto-sincronizan con `ActiveResource::Base.headers` y `PaperTrail.request` cuando estan definidos.
 
+#### Hook `log_fields` — inyectar campos custom en cada log
+
+Class method overridable que retorna un Hash de campos extra para JsonFormatter. Cubre tanto **constantes de proceso** (frozen constants en la subclass) como **valores dinámicos per-request** (atributos de Current) en un solo lugar. Default `{}`.
+
+```ruby
+class Current < ExisRay::Current
+  TENANT_ID = ENV.fetch("TENANT_ID").freeze   # static, frozen al boot
+  attribute :region                             # dynamic, per-request
+
+  def self.log_fields
+    { tenant_id: TENANT_ID, region: region }.compact
+  end
+end
+```
+
+Reglas:
+
+- `JsonFormatter` filtra claves sensibles del hash retornado (mismo regex que el resto del formatter).
+- Si el override revienta, el formatter rescata silenciosamente (logging no afecta flujo principal).
+- Precedencia: campos canónicos del Tracer y keys del mensaje del developer pisan `log_fields` en colisión. Solo sirve para agregar fields nuevos, no para overrideear los canónicos.
+
 ### ExisRay::Reporter (clase base abstracta)
 
 ```ruby

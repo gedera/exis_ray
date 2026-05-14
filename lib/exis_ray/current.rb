@@ -8,6 +8,30 @@ module ExisRay
   class Current < ActiveSupport::CurrentAttributes
     attribute :user_id, :isp_id, :correlation_id
 
+    # Hook overridable por la subclass de la app host. Retorna un Hash de campos
+    # extra a inyectar en cada log line, junto a `user_id`/`isp_id`/`correlation_id`.
+    #
+    # Pensado para cubrir tanto constantes de proceso (declaradas como `freeze`-d
+    # constants en la subclass) como valores dinámicos per-request (leídos de
+    # atributos de Current). El JsonFormatter invoca este método en cada log y
+    # mergea el resultado al payload — luego de los campos canónicos pero antes
+    # de las keys del propio mensaje del developer (que ganan por override).
+    #
+    # @example Constantes de proceso + valores per-request combinados
+    #   class Current < ExisRay::Current
+    #     TENANT_ID = ENV.fetch("TENANT_ID").freeze
+    #     attribute :region
+    #
+    #     def self.log_fields
+    #       { tenant_id: TENANT_ID, region: region }.compact
+    #     end
+    #   end
+    #
+    # @return [Hash] Pares clave/valor a inyectar. Default `{}`.
+    def self.log_fields
+      {}
+    end
+
     # Callback nativo de Rails: Se ejecuta automáticamente al llamar a Current.reset
     resets do
       @user_object = nil

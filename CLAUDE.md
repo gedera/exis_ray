@@ -111,6 +111,7 @@ ExisRay.configuration.json_logs?                # => true/false
 | `correlation_id` | Cuando `Current.correlation_id` está presente |
 | `user_id` | Cuando `Current.user_id` está presente |
 | `isp_id` | Cuando `Current.isp_id` está presente |
+| `Current.log_fields` (cualquier key) | Si la subclass overrideó el hook (default `{}`) |
 | `sidekiq_job` | Solo en procesos Sidekiq |
 | `task` | Solo en procesos TaskMonitor |
 | `tags` | Solo si hay Rails tagged logging activo |

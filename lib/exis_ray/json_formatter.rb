@@ -122,9 +122,28 @@ module ExisRay
       payload[:user_id] = curr.user_id if curr.respond_to?(:user_id) && !curr.user_id.nil?
       payload[:isp_id]  = curr.isp_id  if curr.respond_to?(:isp_id)  && !curr.isp_id.nil?
 
-      return unless curr.respond_to?(:correlation_id) && curr.correlation_id
+      payload[:correlation_id] = curr.correlation_id if curr.respond_to?(:correlation_id) && curr.correlation_id
 
-      payload[:correlation_id] = curr.correlation_id
+      inject_log_fields(payload, curr)
+    end
+
+    # Mergea el resultado de `Current.log_fields` al payload, aplicando el mismo
+    # filtrado de claves sensibles que el resto del formatter. Si la subclass del
+    # host overrideó el hook y revienta, el error se traga: logging nunca debe
+    # afectar el flujo principal.
+    #
+    # @param payload [Hash]
+    # @param curr [Class] La clase Current configurada por la app host.
+    # @return [void]
+    def inject_log_fields(payload, curr)
+      return unless curr.respond_to?(:log_fields)
+
+      fields = curr.log_fields
+      return if fields.nil? || fields.empty?
+
+      payload.merge!(filter_sensitive_hash(fields))
+    rescue StandardError
+      nil
     end
 
     # Inyecta cualquier etiqueta nativa (tags) de Rails que esté presente en el hilo actual.

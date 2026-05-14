@@ -44,16 +44,12 @@ module ExisRay
       # y safe_constantize puede fallar aún con eager_load=true.
       if (name = ExisRay.configuration.current_class).present?
         klass = name.safe_constantize
-        if klass && !klass.<=(ExisRay::Current)
-          raise "ExisRay: current_class '#{name}' does not inherit from ExisRay::Current"
-        end
+        raise "ExisRay: current_class '#{name}' does not inherit from ExisRay::Current" if klass && !klass.<=(ExisRay::Current)
       end
 
       if (name = ExisRay.configuration.reporter_class).present?
         klass = name.safe_constantize
-        if klass && !klass.<=(ExisRay::Reporter)
-          raise "ExisRay: reporter_class '#{name}' does not inherit from ExisRay::Reporter"
-        end
+        raise "ExisRay: reporter_class '#{name}' does not inherit from ExisRay::Reporter" if klass && !klass.<=(ExisRay::Reporter)
       end
 
       # Aplicamos el formateador JSON globalmente al logger ya instanciado de Rails

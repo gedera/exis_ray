@@ -112,4 +112,38 @@ RSpec.describe ExisRay::Current do
       TestCurrent.correlation_id = "corr-1"
     end
   end
+
+  describe ".log_fields hook" do
+    it "retorna un Hash vacío por defecto" do
+      expect(TestCurrent.log_fields).to eq({})
+    end
+
+    it "permite que la subclass overridee el método para inyectar campos custom" do
+      stub_const("TenantCurrent", Class.new(ExisRay::Current) do
+        def self.log_fields
+          { tenant_id: "42", region: "us-east-1" }
+        end
+      end)
+
+      expect(TenantCurrent.log_fields).to eq(tenant_id: "42", region: "us-east-1")
+    end
+
+    it "soporta combinar constantes de proceso con atributos per-request" do
+      stub_const("MixedCurrent", Class.new(ExisRay::Current) do
+        attribute :region
+
+        STATIC_TENANT = "tenant-42"
+
+        def self.log_fields
+          { tenant_id: STATIC_TENANT, region: region }.compact
+        end
+      end)
+      MixedCurrent.region = "us-east-1"
+
+      expect(MixedCurrent.log_fields).to eq(tenant_id: "tenant-42", region: "us-east-1")
+
+      MixedCurrent.reset
+      expect(MixedCurrent.log_fields).to eq(tenant_id: "tenant-42")
+    end
+  end
 end

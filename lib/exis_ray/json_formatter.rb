@@ -102,6 +102,12 @@ module ExisRay
     # @param payload [Hash] El diccionario del log donde se insertarán los datos.
     # @return [void]
     def inject_tracer_context(payload)
+      # `request_id` (UUID v4 de Rails) tiene distinto ciclo de vida que
+      # `root_id` (formato X-Ray). Se emite fuera del guard de `root_id`:
+      # un servicio puede querer correlación por request_id aunque no haya
+      # trace context activo. Ver issue #9 (Gap C).
+      payload[:request_id] = ExisRay::Tracer.request_id if ExisRay::Tracer.request_id
+
       return unless ExisRay::Tracer.root_id
 
       payload[:root_id]  = ExisRay::Tracer.root_id

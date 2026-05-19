@@ -105,9 +105,10 @@ ExisRay.configuration.json_logs?                # => true/false
 | `service` | Siempre |
 | `service_version` | Siempre (de `config.version` o `config.x.version`) |
 | `deployment_environment` | Siempre (de `Rails.env`) |
+| `request_id` | Cuando `Tracer.request_id` está presente (independiente de root_id) |
 | `root_id` | Cuando hay trace context activo |
 | `trace_id` | Cuando hay trace context activo |
-| `source` | Cuando hay trace context activo |
+| `source` | Cuando hay trace context activo (HTTP siempre genera root fresco si no llega header) |
 | `correlation_id` | Cuando `Current.correlation_id` está presente |
 | `user_id` | Cuando `Current.user_id` está presente |
 | `isp_id` | Cuando `Current.isp_id` está presente |

@@ -51,10 +51,23 @@ ExisRay opera en tres capas que se combinan automáticamente:
 
 **Flujo de propagación:**
 
-1. Un request/job/mensaje llega al servicio. El middleware correspondiente hidrata el `Tracer` con el header entrante (o genera un nuevo `root_id` si no trae uno).
-2. `JsonFormatter` inyecta automáticamente `root_id`, `trace_id`, `source` y el contexto de negocio (`user_id`, `isp_id`, `correlation_id`) en cada línea de log.
+1. Un request/job/mensaje llega al servicio. El middleware correspondiente hidrata el `Tracer` con el header entrante. **Todo entrypoint garantiza un `root_id`**: si no llega trace header (servicio que es punto de entrada, no eslabón intermedio), genera uno fresco. En HTTP además captura el `request_id` de Rails.
+2. `JsonFormatter` inyecta automáticamente `root_id`, `trace_id`, `source`, `request_id` y el contexto de negocio (`user_id`, `isp_id`, `correlation_id`) en cada línea de log. Como el entrypoint siempre asegura `root_id`, `source` (campo mandatorio) nunca falta.
 3. Cuando el servicio llama a otro servicio (HTTP, Sidekiq, RabbitMQ), el middleware de salida genera un nuevo header con `Tracer.generate_trace_header`, que incluye el `root_id` original, el `self_id` del servicio actual, el `CalledFrom` y el tiempo acumulado.
 4. El servicio destino repite desde el paso 1. El `root_id` se mantiene constante a lo largo de toda la cadena.
+
+## Documentación de detalle
+
+Artefactos de detalle (RFC-008 — el contrato y el significado viven acá; este README indexa y resume, no duplica):
+
+| Capa | Artefacto | Estado |
+|:-----|:----------|:-------|
+| Comportamiento | [`docs/behavior/behavior.md`](docs/behavior/behavior.md) — secuencias de hidratación de trace por entrypoint y emisión en logs | parcial, incremental por PR |
+| Glosario | [`docs/glossary/glossary.md`](docs/glossary/glossary.md) — lenguaje ubicuo (`root_id`, `trace_id`, `source`, `request_id`, `entrypoint`, ...) | sembrado inicial, acreta |
+| Datos | — | n/a (gema sin DB) |
+| Operaciones · Interfaz · Topología | — | F2 `dev-structure`, no implementado |
+
+> **Coexistencia transitoria (RFC-008 §2):** las secciones _Cómo funciona_, _Campos auto-inyectados_ y _Referencia del Tracer_ de este README contienen contrato/arquitectura cuyo destino estructural (`docs/interface`, `docs/topology`) es **F2 no implementado**. Permanecen embebidas hasta que esas capas existan; el significado y las secuencias ya migraron a `docs/glossary` y `docs/behavior` y se referencian desde acá.
 
 ## Instalación
 
@@ -336,9 +349,10 @@ config.logger.formatter = ExisRay::JsonFormatter
 | `service` | Siempre (nombre de la app Rails en snake_case) |
 | `service_version` | Siempre (lee de `config.version` o `config.x.version`) |
 | `deployment_environment` | Siempre (lee de `Rails.env`) |
-| `root_id` | Cuando hay trace context activo |
-| `trace_id` | Cuando hay trace context activo |
-| `source` | Cuando hay trace context activo (`http`, `sidekiq`, `task`, `system`) |
+| `request_id` | Cuando `Tracer.request_id` está presente (independiente del trace context — ver [glosario](docs/glossary/glossary.md)) |
+| `root_id` | Siempre en cualquier entrypoint (genera uno fresco si no llega trace header) |
+| `trace_id` | Cuando hay trace header entrante parseado (eslabón intermedio) |
+| `source` | Siempre en cualquier entrypoint (`http`, `sidekiq`, `task`, `system`) |
 | `correlation_id` | Cuando `Current.correlation_id` está presente |
 | `user_id` | Cuando `Current.user_id` no es nil |
 | `isp_id` | Cuando `Current.isp_id` no es nil |

@@ -15,6 +15,7 @@ RSpec.describe ExisRay::JsonFormatter do
       def self.service_name = "test-service"
       def self.root_id      = nil
       def self.trace_id     = nil
+      def self.request_id   = nil
     end)
 
     allow(ExisRay).to receive(:current_class).and_return(nil)
@@ -403,6 +404,62 @@ RSpec.describe ExisRay::JsonFormatter do
                              "detail" => "some extra info",
                              "status" => 500
                            })
+    end
+  end
+
+  describe "inyección de contexto de tracer (issue #9)" do
+    def stub_tracer(root_id:, request_id:, source:, trace_id: nil)
+      stub_const("ExisRay::Tracer", Module.new do
+        define_singleton_method(:service_name) { "test-service" }
+        define_singleton_method(:root_id) { root_id }
+        define_singleton_method(:trace_id) { trace_id }
+        define_singleton_method(:request_id) { request_id }
+        define_singleton_method(:source) { source }
+        define_singleton_method(:sidekiq_job) { nil }
+        define_singleton_method(:task) { nil }
+      end)
+    end
+
+    context "cuando hay trace context activo (root_id presente)" do
+      before { stub_tracer(root_id: "1-abc-def", request_id: "uuid-1", source: "http", trace_id: "Root=1-abc-def") }
+
+      it "emite root_id, trace_id, source y request_id" do
+        result = call("event=acct.received")
+
+        expect(result).to include(
+          "root_id" => "1-abc-def",
+          "trace_id" => "Root=1-abc-def",
+          "source" => "http",
+          "request_id" => "uuid-1"
+        )
+      end
+    end
+
+    context "cuando NO hay trace context (root_id nil) pero sí request_id (Gap C)" do
+      before { stub_tracer(root_id: nil, request_id: "uuid-2", source: "http") }
+
+      it "emite request_id aunque root_id esté ausente" do
+        result = call("event=acct.received")
+
+        expect(result["request_id"]).to eq("uuid-2")
+      end
+
+      it "no emite root_id ni trace_id" do
+        result = call("event=acct.received")
+
+        expect(result).not_to have_key("root_id")
+        expect(result).not_to have_key("trace_id")
+      end
+    end
+
+    context "cuando no hay request_id" do
+      before { stub_tracer(root_id: "1-x-y", request_id: nil, source: "http") }
+
+      it "no incluye la clave request_id" do
+        result = call("event=acct.received")
+
+        expect(result).not_to have_key("request_id")
+      end
     end
   end
 

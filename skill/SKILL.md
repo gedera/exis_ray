@@ -1,6 +1,6 @@
 ---
 name: exis-ray
-description: Skill de conocimiento completo sobre ExisRay, la capa de observabilidad y trazabilidad distribuida del ecosistema Wispro. Consultame para integración, arquitectura, API, errores y antipatrones.
+description: Conocimiento completo de ExisRay, la capa de observabilidad y trazabilidad distribuida del ecosistema Wispro (logging JSON estructurado, trace context AWS X-Ray, propagación entre servicios). ACTIVAR cuando un servicio o gema Rails integra/configura ExisRay, emite o debuggea logs JSON estructurados, propaga trace context (header X-Amzn-Trace-Id) entre HTTP/Sidekiq/BugBunny, usa ExisRay::Tracer/Current/Reporter/JsonFormatter/TaskMonitor, edita el initializer de ExisRay, o resuelve errores/antipatrones de logging-trazabilidad Wispro.
 ---
 
 # ExisRay Expert
@@ -8,6 +8,14 @@ description: Skill de conocimiento completo sobre ExisRay, la capa de observabil
 Observabilidad y trazabilidad distribuida para microservicios Rails (AWS X-Ray compatible).
 
 Para el complemento del estándar de logging Wispro (regla Data First, mapeo OpenTelemetry, ciclo de vida de jobs/requests), ver `references/standard.md`.
+
+### Artefactos de detalle (RFC-008)
+
+Este SKILL.md **resume e indexa**; el contrato y el significado de detalle viven en `docs/<capa>/`. **Version-lock por construcción:** `gemspec.files` empaqueta `docs/**` en el mismo tag que este `SKILL.md`; los links son rutas relativas dentro del paquete del release (nunca rama/`HEAD`/URL flotante). Contrato resumido anclado a **v0.8.0 + fix issue #9** (commit `00cf803`):
+
+- [`docs/behavior/behavior.md`](../docs/behavior/behavior.md) — secuencias de hidratación de trace por entrypoint + emisión en logs (parcial, incremental).
+- [`docs/glossary/glossary.md`](../docs/glossary/glossary.md) — lenguaje ubicuo del bounded context (`root_id`, `trace_id`, `source`, `request_id`, `entrypoint`, ...).
+- Datos = n/a (gema sin DB). Operaciones/Interfaz/Topología = F2 `dev-structure`, no implementado: contrato Ruby permanece embebido abajo (coexistencia transitoria RFC-008 §2).
 
 ---
 
@@ -67,11 +75,11 @@ ExisRay unifica trazabilidad distribuida, logging estructurado JSON, contexto de
 
 ### Flujo runtime (HTTP request)
 
-1. `HttpMiddleware` lee `trace_header` del env Rack, llama `Tracer.hydrate(trace_id:, source: "http")`
+1. `HttpMiddleware` lee `trace_header` del env Rack, llama `Tracer.hydrate(trace_id:, source: "http")`. **Si no llega header** (servicio entrypoint, no eslabón intermedio) genera un `root_id` fresco — paridad con `Sidekiq::ServerMiddleware`/`BugBunny::ConsumerTracingMiddleware`/`TaskMonitor`. Captura `request_id` de `action_dispatch.request_id`. Secuencia detallada: `docs/behavior/behavior.md`.
 2. `Tracer.parse_trace_id` extrae `root_id`, `self_id`, `called_from`, `total_time_so_far`
 3. `ExisRay.sync_correlation_id` asigna `Tracer.correlation_id` a `Current.correlation_id`
 4. Controller ejecuta `before_action` para setear `Current.user_id`, `Current.isp_id`
-5. `JsonFormatter` intercepta cada `Rails.logger.*` e inyecta automaticamente: `time`, `level`, `severity_number`, `service`, `service_version`, `deployment_environment`, `root_id`, `trace_id`, `source`, `user_id`, `isp_id`, `correlation_id`. El developer aporta `component` (modulo de negocio) y `event` (que paso); estos NO son auto-inyectados porque dependen del call site, no del contexto de ejecucion.
+5. `JsonFormatter` intercepta cada `Rails.logger.*` e inyecta automaticamente: `time`, `level`, `severity_number`, `service`, `service_version`, `deployment_environment`, `request_id` (fuera del guard de `root_id` — distinto ciclo de vida), `root_id`, `trace_id`, `source`, `user_id`, `isp_id`, `correlation_id`. Como el entrypoint siempre garantiza `root_id`, `source` (mandatorio) nunca falta. El developer aporta `component` (modulo de negocio) y `event` (que paso); estos NO son auto-inyectados porque dependen del call site, no del contexto de ejecucion.
 6. `LogSubscriber` emite un unico Hash al finalizar el request con campos default (`component`, `event`, `method`, `path`, `http_route`, `format`, `controller`, `action`, `http_status`, `duration_s`, `duration_human`, `view_runtime_s`, `db_runtime_s`, `user_agent_original`, `server_address`, y en error `error_class`/`error_message`/`exception.*`).
 7. En llamadas salientes, `FaradayMiddleware`/`ActiveResourceInstrumentation` inyectan `propagation_trace_header` con `Tracer.generate_trace_header`
 8. Al finalizar, `ActiveSupport::CurrentAttributes` hace reset automatico

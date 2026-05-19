@@ -1,3 +1,11 @@
+## [0.9.0] - 2026-05-19
+
+### Correcciones
+- **HTTP entrypoint sin trace header no emitía `root_id`/`source`/`request_id`** (#9): `HttpMiddleware` era el único entrypoint sin fallback de `root_id`. Un servicio que es punto de entrada (no eslabón intermedio de un trace distribuido) emitía log lines sin `root_id` y, por efecto cascada en `JsonFormatter#inject_tracer_context` (`return unless root_id`), sin `source` —campo mandatorio del estándar Wispro—. Ahora `HttpMiddleware` genera un `root_id` fresco cuando no llega trace header, igual que `Sidekiq::ServerMiddleware`/`BugBunny::ConsumerTracingMiddleware`/`TaskMonitor`. Además `JsonFormatter` emite `request_id` fuera del guard de `root_id` (distinto ciclo de vida: UUID v4 de Rails vs formato X-Ray), así un servicio puede correlacionar por request aunque no haya trace context activo.
+
+### Documentación
+- **Artefactos dev-\* (RFC-008/010)**: nuevos `docs/behavior/behavior.md` (RFC-007 — secuencia de hidratación de trace por entrypoint y emisión en logs, cobertura declarada) y `docs/glossary/glossary.md` (RFC-009 — lenguaje ubicuo del bounded context: `root_id`, `trace_id`, `source`, `request_id`, `entrypoint`, ...). `README.md` y `skill/SKILL.md` recompuestos indexando el detalle (indexa, no duplica): índice de artefactos, nota de coexistencia transitoria para capas F2, version-lock declarado y `description` endurecida como contrato de discoverability.
+
 ## [0.8.0] - 2026-05-14
 
 ### Nuevas funcionalidades

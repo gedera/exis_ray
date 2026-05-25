@@ -79,7 +79,7 @@ ExisRay unifica trazabilidad distribuida, logging estructurado JSON, contexto de
 2. `Tracer.parse_trace_id` extrae `root_id`, `self_id`, `called_from`, `total_time_so_far`
 3. `ExisRay.sync_correlation_id` asigna `Tracer.correlation_id` a `Current.correlation_id`
 4. Controller ejecuta `before_action` para setear `Current.user_id`, `Current.isp_id`
-5. `JsonFormatter` intercepta cada `Rails.logger.*` e inyecta automaticamente: `time`, `level`, `severity_number`, `service`, `service_version`, `deployment_environment`, `request_id` (fuera del guard de `root_id` — distinto ciclo de vida), `root_id`, `trace_id`, `source`, `user_id`, `isp_id`, `correlation_id`. Como el entrypoint siempre garantiza `root_id`, `source` (mandatorio) nunca falta. El developer aporta `component` (modulo de negocio) y `event` (que paso); estos NO son auto-inyectados porque dependen del call site, no del contexto de ejecucion.
+5. `JsonFormatter` intercepta cada `Rails.logger.*` e inyecta el contexto de ejecucion en cada linea. **No es incondicional:** cada campo tiene un guard especifico (ver tabla "Condiciones de emision" mas abajo). En particular `inject_tracer_context` corta el bloque `root_id`/`trace_id`/`source`/`task`/`sidekiq_job` con `return unless Tracer.root_id` — la invariante "todo entrypoint garantiza `root_id`" es lo que hace que `source` (mandatorio) nunca falte. `request_id` se emite **fuera** de ese guard (distinto ciclo de vida que `root_id`). El developer aporta `component` (modulo de negocio) y `event` (que paso); estos NO son auto-inyectados porque dependen del call site, no del contexto de ejecucion.
 6. `LogSubscriber` emite un unico Hash al finalizar el request con campos default (`component`, `event`, `method`, `path`, `http_route`, `format`, `controller`, `action`, `http_status`, `duration_s`, `duration_human`, `view_runtime_s`, `db_runtime_s`, `user_agent_original`, `server_address`, y en error `error_class`/`error_message`/`exception.*`).
 7. En llamadas salientes, `FaradayMiddleware`/`ActiveResourceInstrumentation` inyectan `propagation_trace_header` con `Tracer.generate_trace_header`
 8. Al finalizar, `ActiveSupport::CurrentAttributes` hace reset automatico
@@ -294,6 +294,26 @@ Casteo automatico: integers, floats, objetos JSON (`{...}`, `[...]`). Filtra cla
 - **Manual** (lo aporta cada `Rails.logger.*`): contexto del **call site** — que modulo (`component`) y que paso (`event`). El formatter no puede saber esto sin recorrer el stack en cada log.
 
 Por eso `component` y `event` jamas se auto-inyectan, aunque el estandar Wispro los exija.
+
+#### Condiciones de emision por campo
+
+La auto-inyeccion **no es incondicional**: cada campo tiene un guard. `inject_tracer_context` corta su bloque con `return unless Tracer.root_id`, asi que `root_id`/`trace_id`/`source`/`task`/`sidekiq_job` solo se emiten cuando hay trace context activo. Los 4 entrypoints (HTTP, Sidekiq server, BugBunny consumer, TaskMonitor) garantizan ese `root_id` (fresco si no llega header), por eso `source` (mandatorio) nunca falta en una linea originada por un entrypoint. `request_id` se emite **fuera** del guard de `root_id` — distinto ciclo de vida.
+
+| Campo | Condicion de emision | Entrypoint que la garantiza |
+|:------|:---------------------|:----------------------------|
+| `time`, `level`, `severity_number`, `service`, `service_version`, `deployment_environment` | Siempre (no depende de Tracer/Current) | — |
+| `request_id` | `Tracer.request_id` presente. **Fuera del guard de `root_id`** (issue #9 Gap C): distinto ciclo de vida (UUID v4 de Rails vs formato X-Ray). | HTTP (via `ActionDispatch::RequestId`). Otros entrypoints solo si la app lo setea explicitamente. |
+| `root_id` | `Tracer.root_id` presente. **Gatea todo el bloque de tracer context.** | Los 4 entrypoints garantizan `root_id` fresco si no llega trace header (issue #9 Gap A). |
+| `source` | `Tracer.source` presente **y** `root_id` presente (esta dentro del bloque gateado). | Idem `root_id`. Como `source` es mandatorio del estandar Wispro, la invariante "todo entrypoint garantiza `root_id`" es lo que evita que falte. |
+| `trace_id` | `Tracer.trace_id` presente **y** `root_id` presente. Solo cuando el servicio es **eslabon intermedio** (recibio trace header upstream). | — (entrypoint que no recibe header tiene `root_id` fresco pero `trace_id` nil). |
+| `sidekiq_job` | `Tracer.sidekiq_job` presente **y** `root_id` presente. | Sidekiq `ServerMiddleware`. |
+| `task` | `Tracer.task` presente **y** `root_id` presente. | `TaskMonitor.run`. |
+| `correlation_id` | `Current.correlation_id` presente. | `ExisRay.sync_correlation_id` (HTTP middleware lo llama; otros entrypoints solo si la app lo invoca). |
+| `user_id`, `isp_id` | `Current.<attr>` no nil. | Lo setea la app (login, before_actions, etc.). |
+| `Current.log_fields` (cualquier key) | La subclass de `Current` overrideo el hook y retorno un Hash no vacio. | — |
+| `tags` | Rails tagged logging activo. **Antipatron con JSON** (rompe el formato) — ver FAQ. | — |
+
+Para el detalle por entrypoint (que setea que y cuando), ver [`docs/behavior/behavior.md`](../docs/behavior/behavior.md). Para el significado de cada campo, [`docs/glossary/glossary.md`](../docs/glossary/glossary.md).
 
 #### Ejemplos: KV vs Hash producen output equivalente
 

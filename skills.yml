@@ -2,48 +2,34 @@ mcps:
   - github
   - clickup
 skills:
-  skill-manager:
-    repo: sequre/ai_knowledge
-    scope: local
   yard:
     repo: sequre/ai_knowledge
-    scope: local
   quality-code:
     repo: sequre/ai_knowledge
-    scope: local
   gem-release:
     repo: sequre/ai_knowledge
-    scope: local
-  skill-builder:
+  dev-structure:
     repo: sequre/ai_knowledge
-    scope: local
-  ai-reports:
+  dev-compose:
     repo: sequre/ai_knowledge
-    scope: local
-    environment:
-      space_id: "${AI_REPORTS_SPACE_ID}"
-      bug_reports_list_id: "${AI_REPORTS_BUG_REPORTS_LIST_ID}"
-      improvements_list_id: "${AI_REPORTS_IMPROVEMENTS_LIST_ID}"
-  agent-review:
+  dev-enrich:
     repo: sequre/ai_knowledge
-    scope: local
-    environment:
-      space_id: "${AGENT_REVIEW_SAPCE_ID}"
-      list_id: "${AGENT_LIST_ID}"
-  action-plan:
+  skill-feedback:
+    repo: sequre/ai_knowledge
+  agent-issue:
+    repo: sequre/ai_knowledge
+  dev-flow:
+    repo: sequre/ai_knowledge
+  matrix-element:
     repo: sequre/ai_knowledge
     environment:
-      space_id: "${AGENT_REVIEW_SAPCE_ID}"
-      list_id: "${AGENT_ACTION_PLAN_LIST_ID}"
+      homeserver: "https://matrix.cloud.wispro.co"
+      auth_token: "${MATRIX_AUTH_TOKEN}"
+      rooms:
+        agents: "!VCHwQXgmXdyhhhPhoz:matrix.cloud.wispro.co"
   documentation-writer:
     repo: github/awesome-copilot
     path: skills/documentation-writer
-    scope: local
-  find-skills:
-    repo: vercel-labs/skills
-    path: skills/find-skills
-    scope: local
   opentelemetry:
     repo: bobmatnyc/claude-mpm-skills
     path: universal/observability/opentelemetry
-    scope: local

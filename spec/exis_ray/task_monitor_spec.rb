@@ -49,7 +49,22 @@ RSpec.describe ExisRay::TaskMonitor do
         expect(start_log[0]).to eq(:info)
         expect(start_log[1]).to include("outcome=started")
         expect(start_log[1]).to include("event=task_started")
-        expect(start_log[1]).to include("task=billing:invoices")
+      end
+
+      it "no emite `task=` en el KV (la clave viene del formatter vía Tracer.task)" do
+        captured_task = nil
+        described_class.run("billing:invoices") { captured_task = ExisRay::Tracer.task }
+
+        # task_name vive en el Tracer durante la ejecución del bloque
+        expect(captured_task).to eq("billing:invoices")
+
+        # Los KV de lifecycle NO incluyen `task=...` — evita la duplicación con
+        # `JsonFormatter#inject_tracer_context` (issue #12).
+        lifecycle = captured_logs.map { |_, msg| msg }.select { |m| m.include?("event=task_") }
+        expect(lifecycle).not_to be_empty
+        lifecycle.each do |msg|
+          expect(msg).not_to match(/\btask=/)
+        end
       end
 
       it "loguea task_finished con outcome=success (breaking rename v0.6.0)" do

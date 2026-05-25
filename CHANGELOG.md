@@ -1,3 +1,8 @@
+## [Unreleased]
+
+### Correcciones
+- **Clave `task` duplicada en JSON cuando `TaskMonitor.run` loguea lifecycle** (#12): `TaskMonitor` emitía `task=#{task_name}` en los KV strings de `task_started`/`task_finished` (3 sites: `task_monitor.rb:32,41,48`); `JsonFormatter#inject_tracer_context` ya inyecta la misma clave desde `Tracer.task` con Symbol — al colapsar Symbol/String en `JSON.generate`, `json` emitía `warning: detected duplicate key "task"` y la línea entera va a romper en `json` 3.0. **Fix B** (origen): los KV de lifecycle ya no emiten `task=...`; la clave viene exclusivamente del formatter vía `Tracer.task`. **Fix A** (defensa en profundidad): `JsonFormatter` normaliza todas las claves del payload a String antes de `JSON.generate`, deduplicando con precedencia "última inserción gana" (developer payload pisa contexto canónico inyectado por Tracer, igual que `log_fields`). Cubre futuros casos análogos Tracer ↔ developer KV sobre la misma clave.
+
 ## [0.9.0] - 2026-05-19
 
 ### Correcciones

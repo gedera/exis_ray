@@ -1,4 +1,4 @@
-## [Unreleased]
+## [0.10.0] - 2026-05-25
 
 ### Documentación
 - **`SKILL.md`/`README` describían la auto-inyección como incondicional** (#11): la prosa de "Flujo runtime" en `SKILL.md` y "Flujo de propagación" en `README.md` listaba los campos auto-inyectados (`root_id`, `trace_id`, `source`, `request_id`, ...) sin desglosar los guards. `JsonFormatter#inject_tracer_context` corta su bloque con `return unless Tracer.root_id`, y `request_id` se emite **fuera** de ese guard (distinto ciclo de vida — fix de #9). Sin esa precisión, un implementador en `box_radius_manager` concluyó (apoyándose en la doc) que "`root_id` ya cubre la trazabilidad, `request_id` es redundante" y removió un workaround necesario; en su entrypoint sin trace header `root_id` era nil → logs sin `request_id`/`source`/`root_id`. Agregada subsección "Condiciones de emisión por campo" en `SKILL.md` con tabla "campo → condición → entrypoint que la garantiza", callout en el README arriba de "Campos auto-inyectados", y enlace cruzado a `docs/behavior/behavior.md` + `docs/glossary/glossary.md` (que ya tenían el detalle).

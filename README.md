@@ -52,7 +52,7 @@ ExisRay opera en tres capas que se combinan automáticamente:
 **Flujo de propagación:**
 
 1. Un request/job/mensaje llega al servicio. El middleware correspondiente hidrata el `Tracer` con el header entrante. **Todo entrypoint garantiza un `root_id`**: si no llega trace header (servicio que es punto de entrada, no eslabón intermedio), genera uno fresco. En HTTP además captura el `request_id` de Rails.
-2. `JsonFormatter` inyecta automáticamente `root_id`, `trace_id`, `source`, `request_id` y el contexto de negocio (`user_id`, `isp_id`, `correlation_id`) en cada línea de log. Como el entrypoint siempre asegura `root_id`, `source` (campo mandatorio) nunca falta.
+2. `JsonFormatter` inyecta `root_id`, `trace_id`, `source`, `request_id` y el contexto de negocio (`user_id`, `isp_id`, `correlation_id`) en cada línea de log. **Cada campo tiene un guard:** `root_id`/`trace_id`/`source`/`task`/`sidekiq_job` salen solo si `Tracer.root_id` está presente; `request_id` se emite fuera de ese guard (distinto ciclo de vida). Como todo entrypoint asegura `root_id` (genera uno fresco si no llega header), `source` (mandatorio) nunca falta. Detalle por campo: tabla [Campos auto-inyectados](#campos-auto-inyectados) más abajo.
 3. Cuando el servicio llama a otro servicio (HTTP, Sidekiq, RabbitMQ), el middleware de salida genera un nuevo header con `Tracer.generate_trace_header`, que incluye el `root_id` original, el `self_id` del servicio actual, el `CalledFrom` y el tiempo acumulado.
 4. El servicio destino repite desde el paso 1. El `root_id` se mantiene constante a lo largo de toda la cadena.
 
@@ -339,7 +339,9 @@ config.logger.formatter = ExisRay::JsonFormatter
 
 ### Campos auto-inyectados
 
-`JsonFormatter` inyecta estos campos automáticamente en cada línea. **Nunca** los incluyas manualmente en tus logs:
+`JsonFormatter` inyecta estos campos automáticamente en cada línea. **Nunca** los incluyas manualmente en tus logs.
+
+> **No es incondicional.** `root_id`/`trace_id`/`source`/`task`/`sidekiq_job` están gateados por `inject_tracer_context`'s `return unless Tracer.root_id`. Los 4 entrypoints (HTTP, Sidekiq server, BugBunny consumer, TaskMonitor) garantizan el `root_id` (fresco si no llega header), por eso `source` (mandatorio) nunca falta — pero si el código loguea fuera de un entrypoint (boot, código inicializador, hilos sueltos), esos campos pueden faltar. `request_id` se emite fuera de ese guard y tiene distinto ciclo de vida.
 
 | Campo | Condición |
 |:------|:----------|

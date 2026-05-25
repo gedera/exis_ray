@@ -463,6 +463,72 @@ RSpec.describe ExisRay::JsonFormatter do
     end
   end
 
+  describe "dedup de claves Symbol/String (issue #12)" do
+    def stub_tracer_with_task(task_value)
+      stub_const("ExisRay::Tracer", Module.new do
+        define_singleton_method(:service_name) { "test-service" }
+        define_singleton_method(:root_id) { "1-abc-def" }
+        define_singleton_method(:trace_id) { nil }
+        define_singleton_method(:request_id) { nil }
+        define_singleton_method(:source) { "task" }
+        define_singleton_method(:sidekiq_job) { nil }
+        define_singleton_method(:task) { task_value }
+      end)
+    end
+
+    it "no emite warning de `duplicate key` cuando KV string y Tracer setean la misma key" do
+      stub_tracer_with_task("billing:invoices")
+
+      warning = nil
+      original_warn = Warning.method(:warn)
+      Warning.singleton_class.define_method(:warn) { |msg, **| warning = msg }
+
+      begin
+        call("event=task_started task=billing:invoices outcome=started")
+      ensure
+        Warning.singleton_class.define_method(:warn, original_warn)
+      end
+
+      expect(warning).to be_nil
+    end
+
+    it "developer payload (KV string) pisa al contexto canónico inyectado por Tracer" do
+      stub_tracer_with_task("billing:invoices")
+
+      result = call("event=foo task=override outcome=success")
+
+      expect(result["task"]).to eq("override")
+    end
+
+    it "emite la key como String aunque internamente fuese Symbol" do
+      stub_tracer_with_task("billing:invoices")
+
+      json_str = formatter.call(severity, timestamp, progname, "event=task_started outcome=started")
+
+      # Si quedaran ambas (`:task` y `"task"`) el JSON tendría dos veces la key.
+      expect(json_str.scan(/"task"\s*:/).size).to eq(1)
+      expect(JSON.parse(json_str)["task"]).to eq("billing:invoices")
+    end
+
+    it "no incluye keys con valor nil en el output" do
+      stub_const("ExisRay::Tracer", Module.new do
+        define_singleton_method(:service_name) { "test-service" }
+        define_singleton_method(:root_id) { nil }
+        define_singleton_method(:trace_id) { nil }
+        define_singleton_method(:request_id) { nil }
+        define_singleton_method(:source) { nil }
+        define_singleton_method(:sidekiq_job) { nil }
+        define_singleton_method(:task) { nil }
+      end)
+
+      result = call("event=foo")
+
+      expect(result).not_to have_key("root_id")
+      expect(result).not_to have_key("task")
+      expect(result).not_to have_key("source")
+    end
+  end
+
   describe "#filter_sensitive_hash (privado)" do
     it "filtra claves sensibles en el nivel raíz" do
       result = formatter.send(:filter_sensitive_hash, { user: "gabriel", password: "secret" })

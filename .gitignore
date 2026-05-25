@@ -10,3 +10,9 @@
 
 # Variables de entorno
 .env
+
+# dev-flow cache local
+.dev-flow-state.json
+
+# Local agent state (Claude Code, etc.)
+.claude/

@@ -29,7 +29,7 @@ module ExisRay
         curr.correlation_id = ExisRay::Tracer.correlation_id
       end
 
-      log_event(:info, "component=exis_ray event=task_started task=#{task_name} outcome=started")
+      log_event(:info, "component=exis_ray event=task_started outcome=started")
 
       # Bloque de ejecución con o sin tags dependiendo de la configuración
       execute_with_optional_tags(&block)
@@ -38,14 +38,14 @@ module ExisRay
       human_time = ExisRay::Tracer.format_duration(duration_s)
 
       log_event(:info,
-                "component=exis_ray event=task_finished task=#{task_name} " \
+                "component=exis_ray event=task_finished " \
                 "outcome=success duration_s=#{duration_s} duration_human=\"#{human_time}\"")
     rescue StandardError => e
       duration_s = ExisRay::Tracer.current_duration_s
       human_time = ExisRay::Tracer.format_duration(duration_s)
 
       log_event(:error,
-                "component=exis_ray event=task_finished task=#{task_name} " \
+                "component=exis_ray event=task_finished " \
                 "outcome=failed duration_s=#{duration_s} duration_human=\"#{human_time}\" " \
                 "error_class=#{e.class} error_message=#{e.message.inspect} " \
                 "exception.type=#{e.class} exception.message=#{e.message.inspect} " \

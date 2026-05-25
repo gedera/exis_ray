@@ -61,12 +61,28 @@ module ExisRay
       inject_current_tags(payload)
       process_message(payload, msg)
 
-      "#{JSON.generate(payload.compact, { ascii_only: false })}\n"
+      "#{JSON.generate(normalize_keys(payload), { ascii_only: false })}\n"
     rescue StandardError
       fallback_message(severity, timestamp, msg)
     end
 
     private
+
+    # Normaliza todas las claves del payload a strings y deduplica con precedencia
+    # "última inserción gana" (developer payload pisa contexto canónico inyectado
+    # antes, igual que `log_fields`). Previene el warning `duplicate key` que `json`
+    # emite cuando coexisten `:task` (Symbol, vía Tracer) y `"task"` (String, vía
+    # KV string developer) — `json` 3.0 lo va a transformar en error.
+    #
+    # @param payload [Hash]
+    # @return [Hash{String => Object}]
+    def normalize_keys(payload)
+      payload.each_with_object({}) do |(key, value), result|
+        next if value.nil?
+
+        result[key.to_s] = value
+      end
+    end
 
     # @return [String, nil]
     def service_version

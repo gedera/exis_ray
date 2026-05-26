@@ -382,10 +382,22 @@ config.logger.formatter = ExisRay::JsonFormatter
 | `db_runtime_s` | Float\|nil | Solo si ActiveRecord lo reporta |
 | `user_agent_original` | String | Header `User-Agent` |
 | `server_address` | String | Hostname sin puerto del header `Host` |
-| `error_class`, `error_message` | String | Solo en fallo (legacy) |
+| `error_class`, `error_message` | String | Solo en fallo y si `config.emit_legacy_exception_keys` (default `true`, deprecadas) |
 | `exception.type`, `exception.message`, `exception.stacktrace` | String | Solo en fallo (OTel; stack limitado a 20 líneas) |
 
 Severity del log: `ERROR` si `http_status >= 500`, sino `INFO`.
+
+### Migración OTel — `error_class`/`error_message` → `exception.*`
+
+Durante la ventana de transición OTel v1.0, `LogSubscriber` y `TaskMonitor` emiten ambos sets de keys en cada log de error. Cuando todos los consumers (dashboards, queries, alertas) hayan migrado a `exception.type`/`exception.message`/`exception.stacktrace`, desactivar los legacy:
+
+```ruby
+ExisRay.configure do |c|
+  c.emit_legacy_exception_keys = false # default: true
+end
+```
+
+Roadmap: default `false` en v0.12.0; flag y legacy keys removidos en v1.0.
 
 ### Filtrado de claves sensibles
 

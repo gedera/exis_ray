@@ -52,6 +52,15 @@ module ExisRay
     #   @example 'production'
     attr_accessor :deployment_environment
 
+    # @!attribute [rw] emit_legacy_exception_keys
+    #   @return [Boolean] Si true, emite `error_class`/`error_message` junto a `exception.type`/`exception.message`.
+    #   Default `true` durante la ventana de transición OTel v1.0. Setear a `false` cuando todos los
+    #   consumers (dashboards, alertas, queries) hayan migrado a `exception.*` para reducir bytes
+    #   y ruido en logs.
+    #   Aplica a `ExisRay::LogSubscriber` (logs HTTP) y `ExisRay::TaskMonitor` (logs de tasks).
+    #   @example false
+    attr_accessor :emit_legacy_exception_keys
+
     # Inicializa la configuración con valores por defecto compatibles con AWS X-Ray.
     def initialize
       @trace_header = "HTTP_X_AMZN_TRACE_ID"
@@ -62,6 +71,7 @@ module ExisRay
       @log_subscriber_class = nil
       @service_version = default_service_version
       @deployment_environment = default_deployment_environment
+      @emit_legacy_exception_keys = true
     end
 
     # Lee la versión del servicio desde la configuración de Rails.

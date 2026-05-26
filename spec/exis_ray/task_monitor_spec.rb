@@ -109,6 +109,21 @@ RSpec.describe ExisRay::TaskMonitor do
         expect(finish_log[1]).to include("exception.stacktrace=")
       end
 
+      it "omite error_class/error_message cuando emit_legacy_exception_keys=false" do
+        allow(ExisRay.configuration).to receive(:emit_legacy_exception_keys).and_return(false)
+
+        expect do
+          described_class.run("task:boom") { raise "kaboom" }
+        end.to raise_error(RuntimeError, "kaboom")
+
+        finish_log = captured_logs.find { |lvl, msg| lvl == :error && msg.include?("task_finished") }
+        expect(finish_log[1]).not_to include("error_class=")
+        expect(finish_log[1]).not_to include("error_message=")
+        expect(finish_log[1]).to include("exception.type=RuntimeError")
+        expect(finish_log[1]).to include("exception.message=")
+        expect(finish_log[1]).to include("exception.stacktrace=")
+      end
+
       it "resetea el Tracer incluso en caso de error" do
         begin
           described_class.run("task:boom") { raise "kaboom" }

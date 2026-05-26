@@ -47,9 +47,7 @@ module ExisRay
       log_event(:error,
                 "component=exis_ray event=task_finished " \
                 "outcome=failed duration_s=#{duration_s} duration_human=\"#{human_time}\" " \
-                "error_class=#{e.class} error_message=#{e.message.inspect} " \
-                "exception.type=#{e.class} exception.message=#{e.message.inspect} " \
-                "exception.stacktrace=#{format_stacktrace(e.backtrace)}")
+                "#{format_exception_fields(e)}")
       raise e
     ensure
       # Limpieza centralizada obligatoria para evitar filtraciones de memoria o contexto
@@ -124,7 +122,26 @@ module ExisRay
       '""'
     end
 
+    # Construye los campos KV de excepción para el log de `task_finished` failed.
+    # Siempre incluye `exception.type` / `exception.message` / `exception.stacktrace` (OTel v1.0).
+    # Incluye además `error_class` / `error_message` cuando
+    # `ExisRay.configuration.emit_legacy_exception_keys` es `true` (default durante la ventana
+    # de transición).
+    #
+    # @param error [Exception]
+    # @return [String]
+    def self.format_exception_fields(error)
+      message_quoted = error.message.inspect
+      stack = format_stacktrace(error.backtrace)
+
+      parts = []
+      parts << "error_class=#{error.class} error_message=#{message_quoted}" if ExisRay.configuration.emit_legacy_exception_keys
+      parts << "exception.type=#{error.class} exception.message=#{message_quoted} " \
+               "exception.stacktrace=#{stack}"
+      parts.join(" ")
+    end
+
     private_class_method :pod_identifier, :setup_tracer, :execute_with_optional_tags,
-                         :log_event, :format_stacktrace
+                         :log_event, :format_stacktrace, :format_exception_fields
   end
 end

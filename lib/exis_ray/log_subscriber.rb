@@ -129,15 +129,16 @@ module ExisRay
     end
 
     # Extrae los datos de excepción para logs OTel.
-    # Emite tanto los campos legacy (`error_class`/`error_message`) como los OTel
-    # (`exception.type`/`exception.message`/`exception.stacktrace`) durante la ventana
-    # de transición definida en el plan "Breaking changes OTel v1.0".
+    # Siempre emite `exception.type`/`exception.message`/`exception.stacktrace` (OTel v1.0).
+    # Emite además los campos legacy (`error_class`/`error_message`) cuando
+    # `ExisRay.configuration.emit_legacy_exception_keys` es `true` (default durante la
+    # ventana de transición). Setear a `false` cuando los consumers hayan migrado.
     #
     # El stacktrace se toma de `payload[:exception_object]` (expuesto por Rails), no
     # de `payload[:exception]` que es solo `[class_name, message]`.
     #
     # @param payload [Hash] Payload completo del notification de Rails.
-    # @return [Hash] Campos exception.* y error_class/error_message con keys symbol.
+    # @return [Hash] Campos exception.* (y error_class/error_message si el flag está activo).
     def extract_exception_data(payload)
       exception_info = payload[:exception]
       return {} unless exception_info
@@ -146,11 +147,14 @@ module ExisRay
       exception_message = exception_info.last
 
       data = {
-        error_class: exception_class,
-        error_message: exception_message,
         "exception.type": exception_class,
         "exception.message": exception_message
       }
+
+      if ExisRay.configuration.emit_legacy_exception_keys
+        data[:error_class] = exception_class
+        data[:error_message] = exception_message
+      end
 
       exception_object = payload[:exception_object]
       if exception_object.respond_to?(:backtrace) && exception_object.backtrace

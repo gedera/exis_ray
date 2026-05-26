@@ -268,6 +268,22 @@ RSpec.describe ExisRay::LogSubscriber do
       expect(data[:error_message]).to eq("something went wrong")
     end
 
+    it "omite error_class/error_message cuando emit_legacy_exception_keys=false" do
+      allow(ExisRay.configuration).to receive(:emit_legacy_exception_keys).and_return(false)
+
+      event = build_event(payload: base_payload.merge(
+        status: nil,
+        exception: ["RuntimeError", "something went wrong"]
+      ))
+
+      data = subscriber.send(:build_payload, event)
+
+      expect(data[:"exception.type"]).to eq("RuntimeError")
+      expect(data[:"exception.message"]).to eq("something went wrong")
+      expect(data).not_to have_key(:error_class)
+      expect(data).not_to have_key(:error_message)
+    end
+
     it "inyecta exception.stacktrace desde payload[:exception_object]" do
       exception_object = RuntimeError.new("boom")
       exception_object.set_backtrace(["a.rb:1", "b.rb:2", "c.rb:3"])

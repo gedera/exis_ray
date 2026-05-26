@@ -80,7 +80,7 @@ ExisRay unifica trazabilidad distribuida, logging estructurado JSON, contexto de
 3. `ExisRay.sync_correlation_id` asigna `Tracer.correlation_id` a `Current.correlation_id`
 4. Controller ejecuta `before_action` para setear `Current.user_id`, `Current.isp_id`
 5. `JsonFormatter` intercepta cada `Rails.logger.*` e inyecta el contexto de ejecucion en cada linea. **No es incondicional:** cada campo tiene un guard especifico (ver tabla "Condiciones de emision" mas abajo). En particular `inject_tracer_context` corta el bloque `root_id`/`trace_id`/`source`/`task`/`sidekiq_job` con `return unless Tracer.root_id` — la invariante "todo entrypoint garantiza `root_id`" es lo que hace que `source` (mandatorio) nunca falte. `request_id` se emite **fuera** de ese guard (distinto ciclo de vida que `root_id`). El developer aporta `component` (modulo de negocio) y `event` (que paso); estos NO son auto-inyectados porque dependen del call site, no del contexto de ejecucion.
-6. `LogSubscriber` emite un unico Hash al finalizar el request con campos default (`component`, `event`, `method`, `path`, `http_route`, `format`, `controller`, `action`, `http_status`, `duration_s`, `duration_human`, `view_runtime_s`, `db_runtime_s`, `user_agent_original`, `server_address`, y en error `error_class`/`error_message`/`exception.*`).
+6. `LogSubscriber` emite un unico Hash al finalizar el request con campos default (`component`, `event`, `method`, `path`, `http_route`, `format`, `controller`, `action`, `http_status`, `duration_s`, `duration_human`, `view_runtime_s`, `db_runtime_s`, `user_agent_original`, `server_address`, y en error `exception.type`/`exception.message`/`exception.stacktrace` siempre + `error_class`/`error_message` si `config.emit_legacy_exception_keys`).
 7. En llamadas salientes, `FaradayMiddleware`/`ActiveResourceInstrumentation` inyectan `propagation_trace_header` con `Tracer.generate_trace_header`
 8. Al finalizar, `ActiveSupport::CurrentAttributes` hace reset automatico
 
@@ -100,6 +100,7 @@ ExisRay.configure do |config|
   config.log_subscriber_class    = "MyLogSubscriber"        # String|nil, default nil
   config.service_version         = "1.2.3"                  # String|nil, default: Rails config.version o config.x.version
   config.deployment_environment  = "production"             # String|nil, default: Rails.env
+  config.emit_legacy_exception_keys = true                  # Boolean, default true (ventana transicion OTel v1.0)
 end
 
 ExisRay.configuration.json_logs?  # => true si log_format == :json
@@ -233,8 +234,9 @@ ExisRay::TaskMonitor.run("billing:generate_invoices") do
   InvoiceService.process_all
 end
 # Genera root_id propio, loguea task_started/task_finished con outcome y duration_s.
-# En caso de error emite: error_class, error_message (legacy) + exception.type,
-# exception.message, exception.stacktrace (OTel, limitado a 20 lineas).
+# En caso de error emite: exception.type, exception.message, exception.stacktrace
+# (OTel, limitado a 20 lineas) + error_class/error_message si
+# config.emit_legacy_exception_keys es true (default durante ventana de transicion).
 # Re-lanza excepciones despues de loguearlas.
 # Hace reset de Tracer, Current y Reporter en ensure.
 ```
@@ -262,7 +264,7 @@ Reemplaza Lograge. Se suscribe a `process_action.action_controller` y emite un H
 | `db_runtime_s` | Float\|nil | Solo si ActiveRecord lo reporta |
 | `user_agent_original` | String | Header `User-Agent` |
 | `server_address` | String | Hostname sin puerto (de `Host` header) |
-| `error_class`, `error_message` | String | Solo en fallo (legacy) |
+| `error_class`, `error_message` | String | Solo en fallo y si `config.emit_legacy_exception_keys` (default `true`, deprecadas) |
 | `exception.type`, `exception.message`, `exception.stacktrace` | String | Solo en fallo (OTel; stack limitado a 20 lineas) |
 
 Para inyectar campos extra, sobreescribir `extra_fields`:

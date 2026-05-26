@@ -37,6 +37,10 @@ RSpec.describe ExisRay::Configuration do
     it "deployment_environment por defecto es nil fuera de Rails" do
       expect(config.deployment_environment).to be_nil
     end
+
+    it "emit_legacy_exception_keys por defecto es true (ventana de transición OTel)" do
+      expect(config.emit_legacy_exception_keys).to be true
+    end
   end
 
   describe "resource attributes OTel" do
@@ -157,6 +161,13 @@ RSpec.describe ExisRay::Configuration do
       config.log_subscriber_class = "MyLogSubscriber"
 
       expect(config.log_subscriber_class).to eq("MyLogSubscriber")
+    end
+
+    it "permite cambiar emit_legacy_exception_keys" do
+      config = described_class.new
+      config.emit_legacy_exception_keys = false
+
+      expect(config.emit_legacy_exception_keys).to be false
     end
   end
 end

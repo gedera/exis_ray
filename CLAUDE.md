@@ -178,6 +178,7 @@ ExisRay.configure do |config|
   config.propagation_trace_header = 'X-Amzn-Trace-Id'
   config.current_class           = 'Current'
   config.reporter_class          = 'Reporter'
+  config.emit_legacy_exception_keys = true            # default true; pasar a false cuando consumers usen exception.*
 end
 
 # BugBunny publisher — debe agregarse manualmente al cliente

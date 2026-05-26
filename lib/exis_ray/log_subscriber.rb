@@ -98,7 +98,7 @@ module ExisRay
         component: "exis_ray",
         event: "http_request",
         method: payload[:method],
-        path: payload[:path],
+        "url.path": payload[:path],
         http_route: extract_http_route(payload),
         format: payload[:format],
         controller: payload[:controller],
@@ -111,6 +111,8 @@ module ExisRay
         user_agent_original: headers["HTTP_USER_AGENT"],
         server_address: extract_server_address(headers["HTTP_HOST"])
       }
+
+      data[:path] = payload[:path] if ExisRay.configuration.emit_legacy_path_key
 
       data.merge!(exception_data)
       data.merge!(self.class.extra_fields(event))

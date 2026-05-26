@@ -61,6 +61,16 @@ module ExisRay
     #   @example false
     attr_accessor :emit_legacy_exception_keys
 
+    # @!attribute [rw] emit_legacy_path_key
+    #   @return [Boolean] Si true, `ExisRay::LogSubscriber` emite `path` (nombre legacy Wispro)
+    #   junto a `url.path` (OTel v1.0). Default `true` durante la ventana de transición.
+    #   Setear a `false` cuando los consumers (queries, dashboards, alertas) hayan migrado a
+    #   `url.path` para reducir bytes y ruido en logs.
+    #   Nota: `url.path` y `http_route` son semánticamente distintos (URL concreta vs template);
+    #   coinciden como string solo en endpoints sin params — la dupe es esperada y no se elimina.
+    #   @example false
+    attr_accessor :emit_legacy_path_key
+
     # Inicializa la configuración con valores por defecto compatibles con AWS X-Ray.
     def initialize
       @trace_header = "HTTP_X_AMZN_TRACE_ID"
@@ -72,6 +82,7 @@ module ExisRay
       @service_version = default_service_version
       @deployment_environment = default_deployment_environment
       @emit_legacy_exception_keys = true
+      @emit_legacy_path_key = true
     end
 
     # Lee la versión del servicio desde la configuración de Rails.

@@ -80,7 +80,7 @@ ExisRay unifica trazabilidad distribuida, logging estructurado JSON, contexto de
 3. `ExisRay.sync_correlation_id` asigna `Tracer.correlation_id` a `Current.correlation_id`
 4. Controller ejecuta `before_action` para setear `Current.user_id`, `Current.isp_id`
 5. `JsonFormatter` intercepta cada `Rails.logger.*` e inyecta el contexto de ejecucion en cada linea. **No es incondicional:** cada campo tiene un guard especifico (ver tabla "Condiciones de emision" mas abajo). En particular `inject_tracer_context` corta el bloque `root_id`/`trace_id`/`source`/`task`/`sidekiq_job` con `return unless Tracer.root_id` — la invariante "todo entrypoint garantiza `root_id`" es lo que hace que `source` (mandatorio) nunca falte. `request_id` se emite **fuera** de ese guard (distinto ciclo de vida que `root_id`). El developer aporta `component` (modulo de negocio) y `event` (que paso); estos NO son auto-inyectados porque dependen del call site, no del contexto de ejecucion.
-6. `LogSubscriber` emite un unico Hash al finalizar el request con campos default (`component`, `event`, `method`, `path`, `http_route`, `format`, `controller`, `action`, `http_status`, `duration_s`, `duration_human`, `view_runtime_s`, `db_runtime_s`, `user_agent_original`, `server_address`, y en error `exception.type`/`exception.message`/`exception.stacktrace` siempre + `error_class`/`error_message` si `config.emit_legacy_exception_keys`).
+6. `LogSubscriber` emite un unico Hash al finalizar el request con campos default (`component`, `event`, `method`, `url.path` siempre + `path` si `config.emit_legacy_path_key`, `http_route`, `format`, `controller`, `action`, `http_status`, `duration_s`, `duration_human`, `view_runtime_s`, `db_runtime_s`, `user_agent_original`, `server_address`, y en error `exception.type`/`exception.message`/`exception.stacktrace` siempre + `error_class`/`error_message` si `config.emit_legacy_exception_keys`).
 7. En llamadas salientes, `FaradayMiddleware`/`ActiveResourceInstrumentation` inyectan `propagation_trace_header` con `Tracer.generate_trace_header`
 8. Al finalizar, `ActiveSupport::CurrentAttributes` hace reset automatico
 
@@ -101,6 +101,7 @@ ExisRay.configure do |config|
   config.service_version         = "1.2.3"                  # String|nil, default: Rails config.version o config.x.version
   config.deployment_environment  = "production"             # String|nil, default: Rails.env
   config.emit_legacy_exception_keys = true                  # Boolean, default true (ventana transicion OTel v1.0)
+  config.emit_legacy_path_key       = true                  # Boolean, default true (ventana transicion `path` -> `url.path` OTel v1.0)
 end
 
 ExisRay.configuration.json_logs?  # => true si log_format == :json
@@ -252,8 +253,9 @@ Reemplaza Lograge. Se suscribe a `process_action.action_controller` y emite un H
 | `component` | String | Siempre `"exis_ray"` |
 | `event` | String | Siempre `"http_request"` |
 | `method` | String | Verbo HTTP |
-| `path` | String | URL concreta del request |
-| `http_route` | String | Template (ej: `/users/:id`). Baja cardinalidad para dashboards |
+| `url.path` | String | URL concreta del request (OTel v1.0). Siempre presente |
+| `path` | String | Alias legacy de `url.path`. Solo si `config.emit_legacy_path_key` (default `true`, deprecado) |
+| `http_route` | String | Template (ej: `/users/:id`). Baja cardinalidad para dashboards. En endpoints sin params coincide en valor con `url.path` — dupe semanticamente esperada (concrete vs template) |
 | `format` | Symbol/String | `html`, `json`, etc. |
 | `controller` | String | Class name del controller |
 | `action` | String | Nombre del action |

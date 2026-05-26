@@ -151,6 +151,33 @@ RSpec.describe ExisRay::LogSubscriber do
       expect(data[:server_address]).to eq("api.example.com")
     end
 
+    it "emite url.path (OTel v1.0) siempre con la URL concreta" do
+      event = build_event(payload: base_payload)
+
+      data = subscriber.send(:build_payload, event)
+
+      expect(data[:"url.path"]).to eq("/users/42")
+    end
+
+    it "emite path (legacy Wispro) junto a url.path cuando emit_legacy_path_key=true (default)" do
+      event = build_event(payload: base_payload)
+
+      data = subscriber.send(:build_payload, event)
+
+      expect(data[:path]).to eq("/users/42")
+      expect(data[:"url.path"]).to eq("/users/42")
+    end
+
+    it "omite path cuando emit_legacy_path_key=false (solo url.path)" do
+      allow(ExisRay.configuration).to receive(:emit_legacy_path_key).and_return(false)
+      event = build_event(payload: base_payload)
+
+      data = subscriber.send(:build_payload, event)
+
+      expect(data).not_to have_key(:path)
+      expect(data[:"url.path"]).to eq("/users/42")
+    end
+
     # Helper: construye un mock de ActionDispatch::Journey::Route con la API REAL
     # que usa el código de producción (route.defaults, route.path.spec, route.verb).
     # Esto evita el anti-patrón anterior de stubear una API inventada.

@@ -41,6 +41,10 @@ RSpec.describe ExisRay::Configuration do
     it "emit_legacy_exception_keys por defecto es true (ventana de transición OTel)" do
       expect(config.emit_legacy_exception_keys).to be true
     end
+
+    it "emit_legacy_path_key por defecto es true (ventana de transición OTel url.path)" do
+      expect(config.emit_legacy_path_key).to be true
+    end
   end
 
   describe "resource attributes OTel" do
@@ -168,6 +172,13 @@ RSpec.describe ExisRay::Configuration do
       config.emit_legacy_exception_keys = false
 
       expect(config.emit_legacy_exception_keys).to be false
+    end
+
+    it "permite cambiar emit_legacy_path_key" do
+      config = described_class.new
+      config.emit_legacy_path_key = false
+
+      expect(config.emit_legacy_path_key).to be false
     end
   end
 end

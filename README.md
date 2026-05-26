@@ -370,8 +370,9 @@ config.logger.formatter = ExisRay::JsonFormatter
 | `component` | String | Siempre `"exis_ray"` |
 | `event` | String | Siempre `"http_request"` |
 | `method` | String | Verbo HTTP |
-| `path` | String | URL concreta del request |
-| `http_route` | String | Template (ej: `/users/:id`). Baja cardinalidad para dashboards |
+| `url.path` | String | URL concreta del request (OTel v1.0). Siempre presente |
+| `path` | String | Alias legacy de `url.path`. Solo si `config.emit_legacy_path_key` (default `true`, deprecado) |
+| `http_route` | String | Template (ej: `/users/:id`). Baja cardinalidad para dashboards. En endpoints sin params coincide en valor con `url.path` — la dupe es semánticamente esperada (concrete vs template) |
 | `format` | Symbol/String | `html`, `json`, etc. |
 | `controller` | String | Class name del controller |
 | `action` | String | Nombre del action |
@@ -398,6 +399,20 @@ end
 ```
 
 Roadmap: default `false` en v0.12.0; flag y legacy keys removidos en v1.0.
+
+### Migración OTel — `path` → `url.path`
+
+`LogSubscriber` emite `url.path` (nombre OTel v1.0) en todos los logs HTTP. Durante la ventana de transición emite también `path` (alias legacy Wispro). Cuando las queries/dashboards/alertas migren a `url.path`, desactivar el legacy:
+
+```ruby
+ExisRay.configure do |c|
+  c.emit_legacy_path_key = false # default: true
+end
+```
+
+Roadmap: default `false` en v0.12.0; flag y key `path` removidos en v1.0.
+
+> **Sobre `url.path` vs `http_route`:** son semánticamente distintos — `url.path` es la URL **concreta** (alta cardinalidad, ej. `/users/42`), `http_route` es el **template** matcheado (baja cardinalidad, ej. `/users/:id`). En endpoints sin params coinciden en valor (ej. `/up`), pero ambos se siguen emitiendo porque cumplen roles distintos en dashboards/queries downstream. La dupe en valor es esperada, no es un bug.
 
 ### Filtrado de claves sensibles
 

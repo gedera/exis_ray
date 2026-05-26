@@ -1,4 +1,4 @@
-## [Unreleased]
+## [0.11.0] - 2026-05-26
 
 ### Nuevas funcionalidades
 - **`config.emit_legacy_exception_keys`** (#15): nuevo flag de `Configuration` (default `true`) que controla la emisión de las keys legacy `error_class`/`error_message` junto a `exception.type`/`exception.message`. Bajado a `false`, `ExisRay::LogSubscriber` (logs HTTP) y `ExisRay::TaskMonitor` (logs de tasks) emiten solo las keys OTel v1.0 (`exception.*`), reduciendo bytes y ruido downstream cuando los consumers (dashboards, alertas, queries) ya migraron. Mantiene `true` como default durante la ventana de transición — se flipea a `false` en v0.12.0 y se remueve el flag en v1.0 cuando los legacy se eliminen definitivamente.

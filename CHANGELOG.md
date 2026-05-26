@@ -2,6 +2,8 @@
 
 ### Nuevas funcionalidades
 - **`config.emit_legacy_exception_keys`** (#15): nuevo flag de `Configuration` (default `true`) que controla la emisión de las keys legacy `error_class`/`error_message` junto a `exception.type`/`exception.message`. Bajado a `false`, `ExisRay::LogSubscriber` (logs HTTP) y `ExisRay::TaskMonitor` (logs de tasks) emiten solo las keys OTel v1.0 (`exception.*`), reduciendo bytes y ruido downstream cuando los consumers (dashboards, alertas, queries) ya migraron. Mantiene `true` como default durante la ventana de transición — se flipea a `false` en v0.12.0 y se remueve el flag en v1.0 cuando los legacy se eliminen definitivamente.
+- **`url.path` (OTel v1.0) + `config.emit_legacy_path_key`** (#15): `ExisRay::LogSubscriber` empieza a emitir `url.path` (nombre canónico OTel) en todos los logs HTTP. El alias legacy `path` se sigue emitiendo durante la ventana de transición y queda gateado por `config.emit_legacy_path_key` (default `true`). Cuando los consumers (queries, dashboards, alertas) hayan migrado a `url.path`, bajar el flag a `false` para suprimir el alias. Se flipea a `false` en v0.12.0 y se remueve el flag en v1.0.
+- **Doc: `url.path` vs `http_route` no se deduplican** (#15): el caso reportado de "valores idénticos en endpoints estáticos" no es un bug — `url.path` es la URL **concreta** (alta cardinalidad), `http_route` es el **template** (baja cardinalidad). Cumplen roles distintos en dashboards/queries downstream; siguen emitiéndose siempre los dos. Documentado en `README.md` y `skill/SKILL.md` (subsección "Migración OTel — `path` → `url.path`" + nota explicativa de la coexistencia semántica).
 
 ## [0.10.0] - 2026-05-25
 

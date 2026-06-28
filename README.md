@@ -65,7 +65,7 @@ Artefactos de detalle (RFC-008 — el contrato y el significado viven acá; este
 | Comportamiento | [`docs/behavior/behavior.md`](docs/behavior/behavior.md) — secuencias de hidratación de trace por entrypoint y emisión en logs | parcial, incremental por PR |
 | Glosario | [`docs/glossary/glossary.md`](docs/glossary/glossary.md) — lenguaje ubicuo (`root_id`, `trace_id`, `source`, `request_id`, `entrypoint`, ...) | sembrado inicial, acreta |
 | Datos | — | n/a (gema sin DB) |
-| Operaciones · Interfaz · Topología | — | F2 `dev-structure`, no implementado |
+| Operaciones · Interfaz · Topología | — | F2 `arch-structure`, no implementado |
 
 > **Coexistencia transitoria (RFC-008 §2):** las secciones _Cómo funciona_, _Campos auto-inyectados_ y _Referencia del Tracer_ de este README contienen contrato/arquitectura cuyo destino estructural (`docs/interface`, `docs/topology`) es **F2 no implementado**. Permanecen embebidas hasta que esas capas existan; el significado y las secuencias ya migraron a `docs/glossary` y `docs/behavior` y se referencian desde acá.
 

@@ -2,34 +2,16 @@ mcps:
   - github
   - clickup
 skills:
+  multi-vendor-feedback:
   yard:
-    repo: sequre/ai_knowledge
   quality-code:
-    repo: sequre/ai_knowledge
   gem-release:
-    repo: sequre/ai_knowledge
-  dev-structure:
-    repo: sequre/ai_knowledge
-  dev-compose:
-    repo: sequre/ai_knowledge
-  dev-enrich:
-    repo: sequre/ai_knowledge
+  arch-structure:
+  arch-compose:
+  arch-enrich:
   skill-feedback:
-    repo: sequre/ai_knowledge
   agent-issue:
-    repo: sequre/ai_knowledge
+  bug-report:
   dev-flow:
-    repo: sequre/ai_knowledge
-  matrix-element:
-    repo: sequre/ai_knowledge
-    environment:
-      homeserver: "https://matrix.cloud.wispro.co"
-      auth_token: "${MATRIX_AUTH_TOKEN}"
-      rooms:
-        agents: "!VCHwQXgmXdyhhhPhoz:matrix.cloud.wispro.co"
   documentation-writer:
-    repo: github/awesome-copilot
-    path: skills/documentation-writer
-  opentelemetry:
-    repo: bobmatnyc/claude-mpm-skills
-    path: universal/observability/opentelemetry
+  matrix-element:

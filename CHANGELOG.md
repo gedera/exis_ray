@@ -1,3 +1,11 @@
+## [0.11.1] - 2026-06-29
+
+### Documentación
+- **Capa `config` (RFC-012)**: nuevo `docs/config/configuracion.md` — inventario base (10 opciones de `ExisRay.configure` + `HOSTNAME` + inyecciones del Railtie al host §i + gemas configuradas §j) y enriquecimiento semántico §f (categoría · failure-mode · side-effect · scope-override · business-reason por var, 11/11), §g ramificadores y §h threading. — @gedera
+- **Capa `interface` (RFC-004)**: nuevo `docs/interface/interface.md` — superficie Ruby pública consumer-facing (símbolo · tipo · firma · nota), cerrando la coexistencia transitoria del contrato embebido en `skill/SKILL.md`. — @gedera
+- **Capa `test` (RFC-013)**: `docs/test/testing.md` — piloto del artefacto de test (suites RSpec, fixtures, coverage); status RFC-013 `accepted`. — @gedera
+- **Mapa de conocimiento (RFC-008 r2)** en `AGENTS.md`: tabla de cobertura de las 12 capas (presente / n/a / pendiente). `skill/SKILL.md` y `README.md` recompuestos indexando las capas nuevas; SKILL re-anclado a v0.11.1. Sin cambios de código (`lib/` intacto). — @gedera
+
 ## [0.11.0] - 2026-05-26
 
 ### Nuevas funcionalidades

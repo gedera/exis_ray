@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    exis_ray (0.11.0)
+    exis_ray (0.11.1)
       activesupport (>= 6.0)
       railties (>= 6.0)
 

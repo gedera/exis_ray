@@ -11,7 +11,7 @@ Para el complemento del estándar de logging Wispro (regla Data First, mapeo Ope
 
 ### Artefactos de detalle (RFC-008)
 
-Este SKILL.md **resume e indexa**; el contrato y el significado de detalle viven en `docs/<capa>/`. **Version-lock por construcción:** `gemspec.files` empaqueta `docs/**` en el mismo tag que este `SKILL.md`; los links son rutas relativas dentro del paquete del release (nunca rama/`HEAD`/URL flotante). Contrato resumido anclado a **v0.11.0** (migración OTel `url.path` + `emit_legacy_path_key`, issue #15):
+Este SKILL.md **resume e indexa**; el contrato y el significado de detalle viven en `docs/<capa>/`. **Version-lock por construcción:** `gemspec.files` empaqueta `docs/**` en el mismo tag que este `SKILL.md`; los links son rutas relativas dentro del paquete del release (nunca rama/`HEAD`/URL flotante). Contrato resumido anclado a **v0.11.1** (capas de doc config/interface + Mapa de conocimiento; sin cambios de código desde v0.11.0):
 
 - [`docs/behavior/behavior.md`](../docs/behavior/behavior.md) — secuencias de hidratación de trace por entrypoint + emisión en logs (parcial, incremental).
 - [`docs/glossary/glossary.md`](../docs/glossary/glossary.md) — lenguaje ubicuo del bounded context (`root_id`, `trace_id`, `source`, `request_id`, `entrypoint`, ...).

@@ -32,7 +32,7 @@ El estándar de logging que implementa está definido en `skill/SKILL.md` (API, 
   | operaciones | RFC-003 | `n/a` | no expone superficie propia (HTTP/CLI/eventos) — instrumenta al host |
   | dependencias consumidas | RFC-018 | `n/a` | inyecta hooks de tracing, no consume servicios |
   | eventos | RFC-005 | `n/a` | no produce eventos propios; propaga trace en mensajes ajenos |
-  | interfaz | RFC-004 | **pendiente** | API Ruby pública (`lib/exis_ray/`); contrato hoy embebido en `skill/SKILL.md` (coexistencia transitoria RFC-008 §2) |
+  | interfaz | RFC-004 | **presente** | [`docs/interface/interface.md`](docs/interface/interface.md) — superficie pública consumer-facing |
   | topología | RFC-006 | **pendiente** | deps + adapters Sidekiq/BugBunny/Faraday/ActiveResource |
   | release | RFC-014 | **pendiente** | `version.rb` + `CHANGELOG.md` + `.github/workflows/release.yml` (tag `v*` → RubyGems) |
   | errores | RFC-020 | **pendiente** | excepciones de validación de config en el Railtie |

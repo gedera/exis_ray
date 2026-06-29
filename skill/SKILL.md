@@ -17,7 +17,8 @@ Este SKILL.md **resume e indexa**; el contrato y el significado de detalle viven
 - [`docs/glossary/glossary.md`](../docs/glossary/glossary.md) — lenguaje ubicuo del bounded context (`root_id`, `trace_id`, `source`, `request_id`, `entrypoint`, ...).
 - [`docs/config/configuracion.md`](../docs/config/configuracion.md) — inventario de las 10 opciones de `ExisRay.configure` + `HOSTNAME` + inyecciones del Railtie al host (enriquecimiento semántico §f pendiente).
 - [`docs/test/testing.md`](../docs/test/testing.md) — mapa de suites RSpec + fixtures + coverage.
-- Datos · Operaciones · Eventos · Consumidas = `n/a` (gema sin DB, no expone superficie propia ni consume servicios). Interfaz/Topología/Release/Errores = **pendiente**: contrato Ruby permanece embebido abajo (coexistencia transitoria RFC-008 §2). Ver mapa de cobertura completo en `AGENTS.md`.
+- [`docs/interface/interface.md`](../docs/interface/interface.md) — superficie Ruby pública (símbolo · tipo · firma · nota); el detalle de uso de cada símbolo permanece abajo.
+- Datos · Operaciones · Eventos · Consumidas = `n/a` (gema sin DB, no expone superficie propia ni consume servicios). Topología/Release/Errores = **pendiente**. Ver mapa de cobertura completo en `AGENTS.md`.
 
 ---
 

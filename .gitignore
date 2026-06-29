@@ -16,3 +16,6 @@
 
 # Local agent state (Claude Code, etc.)
 .claude/
+# multi-vendor-feedback local profile (paths de binarios locales)
+vendors.local.yaml
+mvf-runs/

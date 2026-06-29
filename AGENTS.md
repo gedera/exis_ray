@@ -16,6 +16,29 @@ El estándar de logging que implementa está definido en `skill/SKILL.md` (API, 
 - **Para agentes AI**: `skill/SKILL.md` + `skill/references/`. Es la skill empaquetada que otros proyectos consumen via `wispro-agent sync`.
 - **Nunca referenciar `skill/` desde `docs/` o `README.md`** — son audiencias distintas.
 
+## Mapa de conocimiento (cómo leer la doc de este repo)
+
+- **Tu conocimiento = la UNIÓN de este repo + sus asociados.** No termina en el `docs/<capa>/` local: incluye la doc de los servicios/gemas de `skills.yml`. Un flujo que cruza servicios (e2e) **no vive como doc estática** en ningún repo — se compone on-demand recorriendo el grafo (RFC-021): seguí las anclas hasta los repos asociados y unificá.
+- **Entrá por** [`skill/SKILL.md`](skill/SKILL.md) — índice de agente; resume el contrato y linkea el detalle.
+- **Cobertura de capas de este repo** (gema de observabilidad, sin DB, instrumenta al host):
+
+  | capa | RFC | estado | artefacto / motivo |
+  |---|---|---|---|
+  | comportamiento | RFC-007 | **presente** | [`docs/behavior/behavior.md`](docs/behavior/behavior.md) — parcial incremental |
+  | glosario | RFC-009 | **presente** | [`docs/glossary/glossary.md`](docs/glossary/glossary.md) — sembrado, acreta |
+  | test | RFC-013 | **presente** | [`docs/test/testing.md`](docs/test/testing.md) — piloto RFC-013 |
+  | configuración | RFC-012 | **presente** | [`docs/config/configuracion.md`](docs/config/configuracion.md) — inventario base; enriquecimiento §f pendiente |
+  | datos | RFC-002 | `n/a` | gema sin DB (sin `db/schema.rb`) |
+  | operaciones | RFC-003 | `n/a` | no expone superficie propia (HTTP/CLI/eventos) — instrumenta al host |
+  | dependencias consumidas | RFC-018 | `n/a` | inyecta hooks de tracing, no consume servicios |
+  | eventos | RFC-005 | `n/a` | no produce eventos propios; propaga trace en mensajes ajenos |
+  | interfaz | RFC-004 | **pendiente** | API Ruby pública (`lib/exis_ray/`); contrato hoy embebido en `skill/SKILL.md` (coexistencia transitoria RFC-008 §2) |
+  | topología | RFC-006 | **pendiente** | deps + adapters Sidekiq/BugBunny/Faraday/ActiveResource |
+  | release | RFC-014 | **pendiente** | `version.rb` + `CHANGELOG.md` + `.github/workflows/release.yml` (tag `v*` → RubyGems) |
+  | errores | RFC-020 | **pendiente** | excepciones de validación de config en el Railtie |
+
+- **Navegar una ancla cross-repo:** tomá la key de servicio en `skills.yml` (`services.<dep>.repo`) → ese repo es checkout hermano local o alcanzable por GitHub MCP. La doc de los asociados ES parte de tu conocimiento accesible.
+
 ## Convenciones del framework
 
 - Este repo **consume skills del framework** declaradas en `skills.yml` (manifiesto raíz). Ese archivo enumera los MCPs y las skills que el repo trae al contexto del agente.

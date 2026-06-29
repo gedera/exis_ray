@@ -1,8 +1,9 @@
 # Test — exis_ray
 
-> meta: artefacto test · RFC-013 (shape v2.1, `proposed`) · generado
-> manualmente (**piloto RFC-013** — suplemento de gema para validar §j/§k) ·
-> anclado a `spec/` · fecha 2026-06-01 · cobertura: completa para los
+> meta: artefacto test · RFC-013 (shape v2.1, `accepted`) · generado
+> manualmente (**piloto RFC-013** — suplemento de gema para validar §j/§k;
+> predata el soporte de `test` en `arch-structure`, futura regeneración vía
+> esa skill) · anclado a `spec/` · fecha 2026-06-01 · cobertura: completa para los
 > componentes aislados; gap real en inyección del Railtie (sin dummy app) y
 > matrix de versiones (CI mono-versión).
 
@@ -124,8 +125,9 @@ testeada en app real** (no hay `spec/dummy/`):
 | Sidekiq client/server middleware | `railtie.rb:107,116` | **sin-test** |
 
 Gap: lo que **define** a la gema (inyectar al host) es lo único sin test.
-Cruza RFC-012 §i del repo (mismo inventario de inyecciones, lado config). Un
-`spec/dummy/` cerraría el gap.
+Cruza [`docs/config/configuracion.md`](../config/configuracion.md) §i (mismo
+inventario de inyecciones del Railtie, lado config). Un `spec/dummy/` cerraría
+el gap.
 
 **Matrix de versiones:**
 

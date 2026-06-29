@@ -64,10 +64,12 @@ Artefactos de detalle (RFC-008 — el contrato y el significado viven acá; este
 |:-----|:----------|:-------|
 | Comportamiento | [`docs/behavior/behavior.md`](docs/behavior/behavior.md) — secuencias de hidratación de trace por entrypoint y emisión en logs | parcial, incremental por PR |
 | Glosario | [`docs/glossary/glossary.md`](docs/glossary/glossary.md) — lenguaje ubicuo (`root_id`, `trace_id`, `source`, `request_id`, `entrypoint`, ...) | sembrado inicial, acreta |
-| Datos | — | n/a (gema sin DB) |
-| Operaciones · Interfaz · Topología | — | F2 `arch-structure`, no implementado |
+| Configuración | [`docs/config/configuracion.md`](docs/config/configuracion.md) — opciones de `ExisRay.configure`, `HOSTNAME` e inyecciones del Railtie al host | inventario base; semántica §f pendiente |
+| Test | [`docs/test/testing.md`](docs/test/testing.md) — suites RSpec, fixtures y coverage | piloto RFC-013 |
+| Datos · Operaciones · Eventos · Consumidas | — | n/a (gema sin DB, no expone superficie propia ni consume servicios) |
+| Interfaz · Topología · Release · Errores | — | pendiente (ver mapa de cobertura en `AGENTS.md`) |
 
-> **Coexistencia transitoria (RFC-008 §2):** las secciones _Cómo funciona_, _Campos auto-inyectados_ y _Referencia del Tracer_ de este README contienen contrato/arquitectura cuyo destino estructural (`docs/interface`, `docs/topology`) es **F2 no implementado**. Permanecen embebidas hasta que esas capas existan; el significado y las secuencias ya migraron a `docs/glossary` y `docs/behavior` y se referencian desde acá.
+> **Coexistencia transitoria (RFC-008 §2):** las secciones _Cómo funciona_, _Campos auto-inyectados_ y _Referencia del Tracer_ de este README contienen contrato/arquitectura cuyo destino estructural (`docs/interface`, `docs/topology`) está **pendiente**. Permanecen embebidas hasta que esas capas existan; el significado y las secuencias ya migraron a `docs/glossary` y `docs/behavior` y se referencian desde acá.
 
 ## Instalación
 

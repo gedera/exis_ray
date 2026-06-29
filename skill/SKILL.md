@@ -11,11 +11,13 @@ Para el complemento del estándar de logging Wispro (regla Data First, mapeo Ope
 
 ### Artefactos de detalle (RFC-008)
 
-Este SKILL.md **resume e indexa**; el contrato y el significado de detalle viven en `docs/<capa>/`. **Version-lock por construcción:** `gemspec.files` empaqueta `docs/**` en el mismo tag que este `SKILL.md`; los links son rutas relativas dentro del paquete del release (nunca rama/`HEAD`/URL flotante). Contrato resumido anclado a **v0.10.0** (post fix issues #9, #11, #12):
+Este SKILL.md **resume e indexa**; el contrato y el significado de detalle viven en `docs/<capa>/`. **Version-lock por construcción:** `gemspec.files` empaqueta `docs/**` en el mismo tag que este `SKILL.md`; los links son rutas relativas dentro del paquete del release (nunca rama/`HEAD`/URL flotante). Contrato resumido anclado a **v0.11.0** (migración OTel `url.path` + `emit_legacy_path_key`, issue #15):
 
 - [`docs/behavior/behavior.md`](../docs/behavior/behavior.md) — secuencias de hidratación de trace por entrypoint + emisión en logs (parcial, incremental).
 - [`docs/glossary/glossary.md`](../docs/glossary/glossary.md) — lenguaje ubicuo del bounded context (`root_id`, `trace_id`, `source`, `request_id`, `entrypoint`, ...).
-- Datos = n/a (gema sin DB). Operaciones/Interfaz/Topología = F2 `dev-structure`, no implementado: contrato Ruby permanece embebido abajo (coexistencia transitoria RFC-008 §2).
+- [`docs/config/configuracion.md`](../docs/config/configuracion.md) — inventario de las 10 opciones de `ExisRay.configure` + `HOSTNAME` + inyecciones del Railtie al host (enriquecimiento semántico §f pendiente).
+- [`docs/test/testing.md`](../docs/test/testing.md) — mapa de suites RSpec + fixtures + coverage.
+- Datos · Operaciones · Eventos · Consumidas = `n/a` (gema sin DB, no expone superficie propia ni consume servicios). Interfaz/Topología/Release/Errores = **pendiente**: contrato Ruby permanece embebido abajo (coexistencia transitoria RFC-008 §2). Ver mapa de cobertura completo en `AGENTS.md`.
 
 ---
 
